@@ -47,4 +47,4 @@ This project is licensed under the Apache License, Version 2.0. See the [LICENSE
 
 ## Support 💬
 
-Issues, feature requests, and requests for assistance can be submitted [here](Link-GithubIssues). All submissions will be reviewed.
+Issues, feature requests, and requests for assistance can be submitted [here](https://github.com/Kereval35/veriFHIR/issues). All submissions will be reviewed.
