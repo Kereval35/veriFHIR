@@ -1,0 +1,102 @@
+/* ============================
+   Global styles
+============================ */
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f9f9f9;
+}
+
+h1 {
+    color: #2F4F4F;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 5px;
+}
+
+p {
+    font-size: 0.95rem;
+}
+
+/* ============================
+   Tables
+============================ */
+table.grid {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* Headers */
+table.grid th {
+    background-color: #4c87af;
+    color: white;
+    padding: 10px;
+    text-align: left;
+}
+
+/* Cells */
+table.grid td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+/* Hover effect */
+table.grid tr:hover {
+    background-color: #e0e0e0;
+}
+table.grid tr.summary-row:hover {
+    background-color: #e0e0e0;
+}
+
+.summary-row {
+    background-color: #f2f2f2;
+}
+
+/* ============================
+   Conditional formatting
+============================ */
+.true-check {
+    background-color: #e6ffe6;
+}
+
+.false-check {
+    background-color: #ffe6e6;
+}
+
+.check-cell {
+    text-align: center;
+    vertical-align: middle;
+    font-size: 1.2rem;
+}
+
+/* ============================
+   Summary bar visualization (optional)
+============================ */
+.summary-bar {
+    height: 18px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.summary-bar.true {
+    background-color: #4CAF50;
+}
+
+.summary-bar.false {
+    background-color: #f44336;
+}
+
+/* ============================
+   Links
+============================ */
+a {
+    color: #1E90FF;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
