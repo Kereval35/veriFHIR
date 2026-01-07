@@ -17,7 +17,7 @@
 
 veriFHIR requires an [OpenAI API](https://platform.openai.com/api-keys) key to work. 
 Follow these steps:
-* Create a new .env file by copying the provided [.env_example](./config/.env_example).
+* Create a new .env file by copying the provided [.env_example](./veriFHIR/config/.env_example).
 * Replace the placeholder with your OpenAI API key.
 
 ### Usage
