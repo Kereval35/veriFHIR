@@ -93,7 +93,7 @@ class FHIRIG():
     def __init__(self, ig_path: Path):
         self._path: Path = ig_path
         self._metadata: Metadata = Metadata(self)
-        self._index_path: Path = self._find_index_path()
+        self._toc_path: Path = self._find_toc_path()
         self._pages: List[Page] = self._load_pages()
         self._artifacts: List[Artifact] = self._load_artifacts()
 
@@ -104,8 +104,8 @@ class FHIRIG():
         return self._path
     def get_metadata(self) -> Metadata:
         return self._metadata
-    def get_index_path(self) -> Path:
-        return self._index_path
+    def get_toc_path(self) -> Path:
+        return self._toc_path
     def get_pages(self) -> List[Page]:
         return self._pages
     def get_artifacts(self) -> List[Artifact]:
@@ -113,32 +113,40 @@ class FHIRIG():
     def get_artifacts_type(self, type: str) -> List[Artifact]:
         return [artifact for artifact in self.get_artifacts() if artifact.get_type() == type]
 
-    def _find_index_path(self) -> Path:
-        index_path: Path
+    def _find_toc_path(self) -> Path:
+        toc_path: Path
         if self.get_metadata().get_ig_type() == "IGPublisher":
-            index_path = Path(self.get_path(), "index.html")
+            toc_path = Path(self.get_path(), "toc.html")
         else:
-            index_path = Path(self.get_path(), "Home.html")
-        if index_path.exists():
-            return index_path
+            toc_path = Path(self.get_path(), "Home.html")
+        if toc_path.exists():
+            return toc_path
         else:
-            raise Exception("IG index page not found.")
+            raise Exception("IG itoc page not found.")
         
     def _load_pages(self) -> List[Page]:
-        pages_files: set = set()
-        with open(self.get_index_path(), 'r' ,encoding="utf8") as f:
+        pages: List[Page] = []
+        with open(self.get_toc_path(), 'r' ,encoding="utf8") as f:
             contents: str = f.read()
         soup: BeautifulSoup = BeautifulSoup(contents, "html.parser")
         for a in soup.find_all("a", href=True):
             link = a["href"]
+            add: bool = True
             if isinstance(link, str) and link.endswith(".html"):
                 if Path(self.get_path(), link).exists():
-                    pages_files.add(link)
-        if len(pages_files) == 0:
+                    if self.get_metadata().get_ig_type() == "IGPublisher":
+                        if Path(self.get_path(), link.replace(".html", ".json")).exists():
+                            add = False
+                    else:
+                        if "artifact" in link.lower():
+                            add = False
+                    if add and link not in [page.get_name() for page in pages]:
+                        pages.append(Page(Path(self.get_path(), link), link))
+        if len(pages) == 0:
             raise Exception("No pages found from the IG index page.")
-        if len(pages_files) > 50:
-            raise Exception(f"Too many pages ({len(pages_files)}) in the IG.")  
-        return [Page(Path(self.get_path(), page), page) for page in pages_files]
+        if len(pages) > 50:
+            raise Exception(f"Too many narrative pages ({len(pages)}) in the IG.") 
+        return pages
     
 
     def _load_artifacts(self) -> List[Artifact]:
