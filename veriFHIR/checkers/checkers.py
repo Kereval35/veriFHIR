@@ -151,7 +151,7 @@ class AllPagesChecker(LLMChecker):
 class PageTypeChecker(LLMChecker):
     def __init__(self, ig: FHIRIG, model: str):
         domain: str = "Pages and organization"
-        elements: List[str] = ["index", "toc", "artifacts", "background", "downloads"]
+        elements: List[str] = ["index", "toc", "artifacts"]
         super().__init__(ig, domain, elements, model) 
 
     def _set_llm(self):
@@ -205,7 +205,9 @@ class TextChecker(LLMChecker):
             ("ms", "an explanation of what 'mustSupport' means for different types of implementations of the IG"),
             ("community", "information on how to engage with the community"),
             ("relationship", "an explanation of the relationship of the IG to any other guides"),
-            ("registry", "a reference to the IG registry as a location to find more IGs of interest")
+            ("registry", "a reference to the IG registry as a location to find more IGs of interest"),
+            ("background", "background information providing context and motivation for the IG"),
+            ("downloads", "information on how to access downloadable artifacts and resources")
         ]
         super().__init__(ig, domain, elements, model) 
 
