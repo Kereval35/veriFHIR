@@ -68,6 +68,20 @@ class Artifact:
         content = json.load(codecs.open(str(self.get_path()), 'r', 'utf-8-sig'))
         return content
 
+    def get_mustSupport_elements(self) -> List[str]:
+        content: dict = self.get_content()
+        if content.get("resourceType") != "StructureDefinition":
+            return []
+        results: List[str] = []
+        for elements in (
+            (content.get("snapshot", {}).get("element", [])),
+            (content.get("differential", {}).get("element", [])),
+        ):
+            for el in elements:
+                if el.get("mustSupport") is True:
+                    results.append(el.get("path"))
+        return results
+
 
 class Page:
     def __init__(self, path: Path, name: str):
@@ -96,6 +110,7 @@ class FHIRIG():
         self._toc_path: Path = self._find_toc_path()
         self._pages: List[Page] = self._load_pages()
         self._artifacts: List[Artifact] = self._load_artifacts()
+        self._mustSupport: bool = self._check_mustSupport()
 
     def set_path(self, path: Path):
         self._path = path
@@ -112,6 +127,8 @@ class FHIRIG():
         return self._artifacts
     def get_artifacts_type(self, type: str) -> List[Artifact]:
         return [artifact for artifact in self.get_artifacts() if artifact.get_type() == type]
+    def get_mustSupport(self) -> bool:
+        return self._mustSupport
 
     def _find_toc_path(self) -> Path:
         toc_path: Path
@@ -171,3 +188,12 @@ class FHIRIG():
                     if isinstance(content, dict) and ("id" in content.keys() and "resourceType" in content.keys()):
                         artifacts.append(Artifact(content["id"], content["resourceType"], file))
         return artifacts
+    
+    def _check_mustSupport(self) -> bool:
+        mustSupport: bool = False
+        for artifact in self.get_artifacts():
+            mustSupport_elements: List[str] = artifact.get_mustSupport_elements()
+            if len(mustSupport_elements) > 0:
+                mustSupport = True
+                break
+        return mustSupport

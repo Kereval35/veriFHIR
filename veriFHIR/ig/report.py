@@ -11,15 +11,15 @@ from veriFHIR.ig.fhir_ig import Metadata
 
 
 class Check:
-    def __init__(self, name: str, value: bool, proof: Optional[str], domain: str):
+    def __init__(self, name: str, value: Optional[bool], proof: Optional[str], domain: str):
         self._name: str = name
-        self._value: bool = value
+        self._value: Optional[bool] = value
         self._proof: Optional[str] = proof
         self._domain: str = domain
 
     def get_name(self) -> str:
         return self._name
-    def get_value(self) -> bool:
+    def get_value(self) -> Optional[bool]:
         return self._value
     def get_proof(self) -> Optional[str]:
         return self._proof
@@ -41,7 +41,7 @@ class Report:
         for check in self.get_checks():
             if check.get_value():
                 domain_counts[check.get_domain()]["True"] += 1
-            else:
+            elif check.get_value() == False:
                 domain_counts[check.get_domain()]["False"] += 1
         return domain_counts
 
@@ -83,7 +83,7 @@ class Report:
             if "True" in value_td.text:
                 value_td.string = "✅"
                 row["class"] = "true-check"
-            else:
+            elif "False" in value_td.text:
                 value_td.string = "❌"
                 row["class"] = "false-check"
             value_td["class"] = "check-cell"

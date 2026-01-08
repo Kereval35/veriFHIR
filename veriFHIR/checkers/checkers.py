@@ -255,8 +255,15 @@ class TextChecker(LLMChecker):
                                     if id in results.keys() and extract.lower() not in ["none", "null"]:
                                         results[id].append({"page": page.get_name(), "extract": extract})
         for id, elem in self.get_elements():
+            value: Optional[bool] = None
+            proof: Optional[str] = None
             result: List = [r for r in results[id] if r["extract"]]
-            value: bool = bool(result)
-            proof: Optional[str] = self._format_proof(result)
+            if id == "ms" and not self.get_ig().get_mustSupport():
+                proof = "mustSupport not used."
+            elif bool(result):
+                value = True
+                proof = self._format_proof(result)
+            else:
+                value = False
             checks.append(Check(f"Presence of {elem}: ", value, proof, self.get_domain()))
         return checks
