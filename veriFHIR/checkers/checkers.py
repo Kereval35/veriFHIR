@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 import json
 import textwrap
-from typing import Tuple, Optional, List, Dict
+from typing import Tuple, Optional, List, Dict, Tuple
 
 from veriFHIR.ig.fhir_ig import FHIRIG
 from veriFHIR.ig.report import Check
@@ -29,6 +29,28 @@ class Checker:
     def check(self) -> List[Check]:
         pass
 
+    def _format_proof(self, title: str, elements: List) -> Optional[str]:
+        if len(elements) == 0:
+            return None
+        proof_lines: List[str] = [f"{title}: "]
+        proof_lines.append("<ul>")
+        for elem in elements:
+            if isinstance(elem, str):
+                proof_lines.append(f"<li>{elem}</li>")
+            elif isinstance(elem[1], List):
+                proof_lines.append("<li>")
+                proof_lines.append(f"{elem[0]}:")
+                proof_lines.append("<ul>")
+                for sub_elem in elem[1]:
+                    proof_lines.append(f"<li>{sub_elem}</li>")
+                proof_lines.append("</ul>")
+                proof_lines.append("</li>")
+            else:
+                proof_lines.append(f"<li>{elem[0]}: {elem[1]}</li>")
+        proof_lines.append("</ul>")
+        proof: str = "\n".join(proof_lines)
+        return proof
+
 
 class ArtifactsChecker(Checker):
     def __init__(self, ig: FHIRIG):
@@ -39,6 +61,7 @@ class ArtifactsChecker(Checker):
         ]
         super().__init__(ig, domain, elements)
 
+    """
     def _format_proof(self, artifacts_ko: dict) -> Optional[str]:
         if not artifacts_ko:
             return None
@@ -52,11 +75,12 @@ class ArtifactsChecker(Checker):
         proof_lines.append("</ul>")
         proof = "\n".join(proof_lines)
         return proof
+    """
 
     def check(self):
         checks: List[Check] = []
         for elem in self.get_elements():
-            artifacts_ko: Dict = {}
+            artifacts_ko: List[Tuple[str, List[str]]] = []
             artifact_types: List[str] = elem.get("types")
             for artifact in self.get_ig().get_artifacts():
                 artifact_content: Dict = artifact.get_content()
@@ -68,9 +92,9 @@ class ArtifactsChecker(Checker):
                     if name not in artifact_content:
                         missing.append(name)
                 if len(missing) > 0:
-                    artifacts_ko[artifact.get_id()] = missing
+                    artifacts_ko.append((artifact.get_id(), missing))
             value: bool = not bool(artifacts_ko)
-            proof: Optional[str] = self._format_proof(artifacts_ko)
+            proof: Optional[str] = self._format_proof("Missing fields per artifacts", artifacts_ko)
             names_label: str = "element" if len(names) == 1 else "elements"
             names_str: str = ", ".join(names)
             types_str: str = f"artifacts of type {', '.join(artifact_types)}" if artifact_types else "all artifacts"
@@ -143,7 +167,8 @@ class AllPagesChecker(LLMChecker):
             proof: Optional[str] = None 
             if len(pages_ko) > 0:
                 value = False
-                proof = f"Missing information {elem} in pages: {', '.join(pages_ko)}"
+                proof = self._format_proof(f"Missing information {elem} in pages", pages_ko)
+                #proof = f"Missing information {elem} in pages: {', '.join(pages_ko)}"
             checks.append(Check(f"Presence of {elem} in all pages: ", value, proof, self.get_domain()))
         return checks
 
@@ -231,6 +256,7 @@ class TextChecker(LLMChecker):
         llm: GPT = GPT(textwrap.dedent(system_prompt), self.get_api_key(), self.get_model())
         return (llm, None)
     
+    """
     def _format_proof(self, result: list[dict]) -> Optional[str]:
         if not result:
             return None
@@ -239,6 +265,7 @@ class TextChecker(LLMChecker):
             lines.append(f"  <li>Extract (page {item['page']}): {item['extract']}</li>")
         lines.append("</ul>")
         return "\n".join(lines)
+    """
 
     def check(self):
         checks: List[Check] = []
@@ -259,16 +286,16 @@ class TextChecker(LLMChecker):
                                 extract: Optional[str] = elem_response.get("extract")
                                 if extract:
                                     if id in results.keys() and extract.lower() not in ["none", "null"]:
-                                        results[id].append({"page": page.get_name(), "extract": extract})
+                                        results[id].append((page.get_name(), extract))
         for id, elem in self.get_elements():
             value: Optional[bool] = None
             proof: Optional[str] = None
-            result: List = [r for r in results[id] if r.get("extract")]
+            result: List = [r for r in results[id] if r[1]]
             if id == "ms" and not self.get_ig().get_mustSupport():
                 proof = "mustSupport not used."
             elif bool(result):
                 value = True
-                proof = self._format_proof(result)
+                proof = self._format_proof("Extract per page", result)
             else:
                 value = False
             checks.append(Check(f"Presence of {elem}: ", value, proof, self.get_domain()))
