@@ -139,7 +139,7 @@ class FHIRIG():
         if toc_path.exists():
             return toc_path
         else:
-            raise Exception("IG itoc page not found.")
+            raise Exception("IG toc page not found.")
         
     def _load_pages(self) -> List[Page]:
         pages: List[Page] = []

@@ -156,7 +156,7 @@ class PageTypeChecker(LLMChecker):
 
     def _set_llm(self):
         base_prompt: str = "Given the name and content of a FHIR implementation guide page, determine which type it matches. Return only one type or None if it does not match any."
-        system_prompt: str = f"{base_prompt}\nPage types: {', '.join(self.get_elements())}"     
+        system_prompt: str = f"{base_prompt}\nPage types: {', '.join(e for e in self.get_elements() if e != 'toc')}"     
         llm: GPT = GPT(system_prompt, self.get_api_key(), self.get_model())
         additional_system_prompt: str = "Which of the following page names best matches the given type? Return only the exact page name." 
         llm_additional: GPT = GPT(additional_system_prompt, self.get_api_key(), self.get_model())
@@ -173,26 +173,32 @@ class PageTypeChecker(LLMChecker):
         for elem in self.get_elements():
             value: bool = False
             proof: str = ""
-            pages: List = results[elem]
-            if len(pages) == 1:
-                value = True
-                proof = "Page: " + pages[0]
-            elif len(pages) > 1:
-                additional_user_prompt: str = f"\nType: {elem}\nPage names: {str(pages)}"
-                if self.get_llm_additional():
-                    response_additional: Optional[str] = self.get_llm_additional().openai_chat_completion_response(additional_user_prompt) #type: ignore
-                else:
-                    raise Exception("Missing additional LLM.")
-                if response_additional:
-                    response_clean: str = response_additional.lower().strip()
-                    for page in pages:
-                        page_base = page.rsplit(".", 1)[0]
-                        if response_clean == page or response_clean == page_base:
-                            value = True
-                            proof = "Page: " + page
-                            break
-                else:
-                    raise Exception("Empty response from LLM.")
+            pages: List = []
+            if elem == "toc":
+                if self.get_ig().get_toc_path():
+                    value = True
+                    proof = self.get_ig().get_toc_path().name
+            else:
+                pages = results[elem]
+                if len(pages) == 1:
+                    value = True
+                    proof = "Page: " + pages[0]
+                elif len(pages) > 1:
+                    additional_user_prompt: str = f"\nType: {elem}\nPage names: {str(pages)}"
+                    if self.get_llm_additional():
+                        response_additional: Optional[str] = self.get_llm_additional().openai_chat_completion_response(additional_user_prompt) #type: ignore
+                    else:
+                        raise Exception("Missing additional LLM.")
+                    if response_additional:
+                        response_clean: str = response_additional.lower().strip()
+                        for page in pages:
+                            page_base = page.rsplit(".", 1)[0]
+                            if response_clean == page or response_clean == page_base:
+                                value = True
+                                proof = "Page: " + page
+                                break
+                    else:
+                        raise Exception("Empty response from LLM.")
             checks.append(Check(f"Presence of page: {elem}", value, proof, self.get_domain()))
         return checks
 
