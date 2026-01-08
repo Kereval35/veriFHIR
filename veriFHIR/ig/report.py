@@ -49,8 +49,8 @@ class Report:
         criteria_summary: defaultdict = self._count_values()
         summary_table_rows: List[List] = []
         for domain, counts in criteria_summary.items():
-            true_count: int = counts["True"]
-            false_count: int = counts["False"]
+            true_count: int = counts.get("True")
+            false_count: int = counts.get("False")
             total: int = true_count + false_count
             true_pct: int = 0
             false_pct: int = 0

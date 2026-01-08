@@ -147,7 +147,7 @@ class FHIRIG():
             contents: str = f.read()
         soup: BeautifulSoup = BeautifulSoup(contents, "html.parser")
         for a in soup.find_all("a", href=True):
-            link = a["href"]
+            link = a.get("href")
             add: bool = True
             if isinstance(link, str) and link.endswith(".html"):
                 if Path(self.get_path(), link).exists():
@@ -175,10 +175,10 @@ class FHIRIG():
                 content = json.load(codecs.open(str(canonicals_path), 'r', 'utf-8-sig'))
                 if isinstance(content, List):
                     for artifact in content:
-                        canonicals.append(artifact["id"])
+                        canonicals.append(artifact.get("id"))
             for file in self.get_path().glob("*.json"):
                 content = json.load(codecs.open(str(file), 'r', 'utf-8-sig'))
-                if isinstance(content, dict) and ("id" in artifact.keys() and "resourceType" in content.keys()) and content["id"] in canonicals:
+                if isinstance(content, dict) and ("id" in artifact.keys() and "resourceType" in content.keys()) and content.get("id") in canonicals:
                     artifacts.append(Artifact(content["id"], content["resourceType"], file))
         else:
             artifacts_path: Path = Path(self.get_path(), "artifacts")

@@ -63,7 +63,7 @@ class ArtifactsChecker(Checker):
                 if artifact_types and artifact_content.get("resourceType") not in artifact_types:
                     continue
                 missing: List[str] = []
-                names: List[str] = elem["names"]
+                names: List[str] = elem.get("names")
                 for name in names:
                     if name not in artifact_content:
                         missing.append(name)
@@ -245,19 +245,19 @@ class TextChecker(LLMChecker):
                 if response:
                     response_json = json.loads(response)
                     if "responses" in response_json.keys():
-                        response_json = response_json["responses"]
+                        response_json = response_json.get("responses")
                     if isinstance(response_json, list):
                         for elem_response in response_json:
                             if all(k in elem_response.keys() for k in ["id", "extract"]):
-                                id: str = elem_response["id"]
-                                extract: Optional[str] = elem_response["extract"]
+                                id: str = elem_response.get("id")
+                                extract: Optional[str] = elem_response.get("extract")
                                 if extract:
                                     if id in results.keys() and extract.lower() not in ["none", "null"]:
                                         results[id].append({"page": page.get_name(), "extract": extract})
         for id, elem in self.get_elements():
             value: Optional[bool] = None
             proof: Optional[str] = None
-            result: List = [r for r in results[id] if r["extract"]]
+            result: List = [r for r in results[id] if r.get("extract")]
             if id == "ms" and not self.get_ig().get_mustSupport():
                 proof = "mustSupport not used."
             elif bool(result):
