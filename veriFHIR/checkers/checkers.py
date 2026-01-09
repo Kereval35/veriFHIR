@@ -61,22 +61,6 @@ class ArtifactsChecker(Checker):
         ]
         super().__init__(ig, domain, elements)
 
-    """
-    def _format_proof(self, artifacts_ko: dict) -> Optional[str]:
-        if not artifacts_ko:
-            return None
-        proof_lines: List[str] = ["<ul>"]
-        for artifact_id, missing in artifacts_ko.items():
-            proof_lines.append(f"<li><b>Artifact (id): {artifact_id}</b>")
-            proof_lines.append("<ul>")
-            for field in missing:
-                proof_lines.append(f"<li>Missing field: {field}</li>")
-            proof_lines.append("</ul></li>")
-        proof_lines.append("</ul>")
-        proof = "\n".join(proof_lines)
-        return proof
-    """
-
     def check(self):
         checks: List[Check] = []
         for elem in self.get_elements():
@@ -168,7 +152,6 @@ class AllPagesChecker(LLMChecker):
             if len(pages_ko) > 0:
                 value = False
                 proof = self._format_proof(f"Missing information {elem} in pages", pages_ko)
-                #proof = f"Missing information {elem} in pages: {', '.join(pages_ko)}"
             checks.append(Check(f"Presence of {elem} in all pages: ", value, proof, self.get_domain()))
         return checks
 
@@ -255,17 +238,6 @@ class TextChecker(LLMChecker):
         """ 
         llm: GPT = GPT(textwrap.dedent(system_prompt), self.get_api_key(), self.get_model())
         return (llm, None)
-    
-    """
-    def _format_proof(self, result: list[dict]) -> Optional[str]:
-        if not result:
-            return None
-        lines: List[str] = ["<ul>"]
-        for item in result:
-            lines.append(f"  <li>Extract (page {item['page']}): {item['extract']}</li>")
-        lines.append("</ul>")
-        return "\n".join(lines)
-    """
 
     def check(self):
         checks: List[Check] = []
