@@ -9,10 +9,46 @@ body {
     background-color: #f9f9f9;
 }
 
+.report-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.report-logo {
+    height: 150px;
+    flex-shrink: 0;
+}
+
+.report-titles {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+
+.report-title {
+    margin: 0;
+    font-size: 1.8rem;
+    color: #991A41;
+}
+
+.report-meta {
+    margin: 0;
+    font-size: 1rem;
+    color: #DF0715;
+}
+
 h1 {
-    color: #2F4F4F;
     border-bottom: 2px solid #ccc;
     padding-bottom: 5px;
+}
+
+h2 {
+    color: #2F4F4F;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 3px;
 }
 
 p {
@@ -31,7 +67,7 @@ table.grid {
 
 /* Headers */
 table.grid th {
-    background-color: #4c87af;
+    background-color: #991A41;
     color: white;
     padding: 10px;
     text-align: left;

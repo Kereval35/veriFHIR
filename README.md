@@ -1,26 +1,28 @@
-# veriFHIR 🔥✅
+<p align="center">
+  <img src="veriFHIR.png" alt="Logo" width="200">
+</p>
 
 **veriFHIR** is a tool designed to support the FHIR interoperability community by **assessing the quality of FHIR Implementation Guides (IGs)**. As FHIR IGs become easier to create, ensuring their consistency, accuracy, and adherence to best practices is increasingly important.
 
 **veriFHIR** performs **automated checks by leveraging Large Language Models (LLMs)** to analyze narrative content and provide actionable insights to improve clarity, consistency, and overall quality.
 
-## Getting started 🚀
+# Getting started 🚀
 
-### Installation
+## Installation
 
 * Make sure Python (version 3.10) is installed on your system.
 * Clone the veriFHIR repository from GitHub.
 * Navigate into the veriFHIR project directory.
 * Install the required dependencies listed in requirements.txt using pip.
 
-### Configuration
+## Configuration
 
 veriFHIR requires an [OpenAI API](https://platform.openai.com/api-keys) key to work. 
 Follow these steps:
 * Create a new .env file by copying the provided [.env_example](./veriFHIR/config/.env_example).
 * Replace the placeholder with your OpenAI API key.
 
-### Usage
+## Usage
 
 Once veriFHIR is installed and configured with your OpenAI API key, run the [main.py](./main.py) script to analyze a FHIR Implementation Guide using the command-line interface.
 
@@ -41,10 +43,10 @@ python main.py--file "path/to/your/implementation_guide.zip" --output "path/to/o
 
 After running the command, veriFHIR will generate a report in the specified output folder.
 
-## License 📜
+# License 📜
 
 This project is licensed under the Apache License, Version 2.0. See the [LICENSE](./LICENSE) file for details.
 
-## Support 💬
+# Support 💬
 
 Issues, feature requests, and requests for assistance can be submitted [here](https://github.com/Kereval35/veriFHIR/issues). All submissions will be reviewed.

@@ -5,7 +5,8 @@ from bs4 import BeautifulSoup
 from pathlib import Path
 from jinja2 import Template
 from datetime import datetime
-from typing import List, DefaultDict, Optional, Union
+from typing import List, DefaultDict, Optional
+import base64
 
 from veriFHIR.ig.fhir_ig import Metadata
 
@@ -92,6 +93,9 @@ class Report:
         css_path: Path = Path("veriFHIR", "config", "report.css")
         with open(css_path, "r", encoding="utf-8") as css_file:
             css_content: str = css_file.read()
+        logo_path: Path = Path("veriFHIR.png")
+        with open(logo_path, "rb") as img:
+            logo_base64: str = base64.b64encode(img.read()).decode("utf-8")
         template_str: str = """
         <!DOCTYPE html>
         <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
@@ -101,10 +105,16 @@ class Report:
             <style>{{ css }}</style>
         </head>
         <body>
-            <h1>Quality review summary</h1>
-            <p>Generated {{ date }}, FHIR version {{ fhir_version }} for {{ name }}#{{ version }}</p>
+            <div class="report-header">
+                <img src="data:image/png;base64,{{ logo_base64 }}" alt="Logo" class="report-logo"/>
+                <div class="report-titles">
+                    <h1 class="report-title">IG quality review report</h1>
+                    <p class="report-meta">Generated {{ date }}, FHIR version {{ fhir_version }} for {{ name }}#{{ version }}</p>
+                </div>
+            </div>
+            <h2 id="quality">Quality review summary</h1>
             {{ summary_table | safe }}
-            <h1 id="quality">Quality checks</h1>
+            <h2 id="quality">Quality checks</h1>
             <p>Inspired by IG Best Practices</a>
             described in <a href="https://build.fhir.org/ig/FHIR/ig-guidance/best-practice.html">Guidance for FHIR IG Creation</a>
             and <a href="https://confluence.hl7.org/spaces/FHIR/pages/66930646/FHIR+Implementation+Guide+Publishing+Requirements">FHIR IG Publishing requirements</a></p>
@@ -116,6 +126,7 @@ class Report:
         now: datetime = datetime.now()
         html_rendered: str = template.render(
             css = css_content,
+            logo_base64 = logo_base64,
             date = now.strftime("%A %d %B %Y (%H:%M)"),
             fhir_version = ig_metadata.get_fhir_version(),
             name = ig_metadata.get_name(),
