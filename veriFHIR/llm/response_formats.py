@@ -22,3 +22,10 @@ class TextCheckResponse(BaseSchemaModel):
 
 class TextCheckResponses(BaseSchemaModel):
     responses: List[TextCheckResponse]
+
+class ComparativeArtifactsCheckResponse(BaseSchemaModel):
+    narrative: str
+    formal: Optional[str]
+
+class ComparativeArtifactsCheckResponses(BaseSchemaModel):
+    responses: List[ComparativeArtifactsCheckResponse]

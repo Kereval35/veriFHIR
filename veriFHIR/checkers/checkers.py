@@ -9,7 +9,7 @@ from typing import Tuple, Optional, List, Dict, Tuple
 from veriFHIR.ig.fhir_ig import FHIRIG, Artifact
 from veriFHIR.ig.report import Check
 from veriFHIR.llm.gpt import GPT
-from veriFHIR.llm.response_formats import TextCheckResponses
+from veriFHIR.llm.response_formats import TextCheckResponses, ComparativeArtifactsCheckResponses
 
 
 class Checker:
@@ -122,7 +122,7 @@ class LLMChecker(Checker):
     def get_llm(self) -> GPT:
         return self._llm
     def get_llm_additional(self) -> Optional[GPT]:
-        return self._llm
+        return self._llm_additional
     
     @abstractmethod
     def _set_llm(self) -> Tuple[GPT, Optional[GPT]]:
@@ -154,7 +154,7 @@ class AllPagesChecker(LLMChecker):
         results_ko: Dict[str, List[str]] = {elem_id: [] for elem_id in elem_ids}
         for page in self.get_ig().get_pages():
             select_elements: str =  "\n* ".join(elem_ids.keys())
-            user_prompt: str = f"\nElements:\n* {select_elements}\nPage content: {page.get_text()}"
+            user_prompt: str = f"\nElements:\n{select_elements}\nPage content: {page.get_text()}"
             response: Optional[str] = self.get_llm().openai_chat_completion_response(user_prompt)
             response_bool: bool = False
             if response:
@@ -313,4 +313,77 @@ class TextChecker(LLMChecker):
             else:
                 value = False
             checks.append(Check(f"Presence of {elem}: ", value, proof, self.get_domain()))
+        return checks
+    
+
+class ComparativeArtifactsChecker(LLMChecker):
+    def __init__(self, ig: FHIRIG, model: str):
+        domain: str = "Comparative analysis"
+        elements: List[str] = ["StructureDefinition", "ValueSet", "CodeSystem", "CapabilityStatement", "ConceptMap"] # others to add ?
+        super().__init__(ig, domain, elements, model) 
+
+    def _set_llm(self):
+        base_prompt: str = """
+        Given the content of a FHIR Implementation Guide page and a list of artifacts types, identify for each type which artifacts appears in the page.
+        **Output format:** Returns a dictionary that maps each artifact type to its corresponding list of artifacts. If there is no artefact for a type, return an empty list. The output must be a single valid JSON object.
+        """
+        system_prompt: str = f"{base_prompt}\nArtifact types: {', '.join(e for e in self.get_elements())}"      
+        llm: GPT = GPT(system_prompt, self.get_api_key(), self.get_model())
+        additional_system_prompt: str = """
+        Given two lists of artifacts extracted from a FHIR Implementation Guide:
+            - The first list (narrative artifacts) comes from the narrative text and may contain informal or partial artifact names.
+            - The second list (formal artifacts) contains the formal ids of artifacts.
+        For each narrative artifact, identify the corresponding formal artifact id.
+        **Output format:** Produce a single valid JSON object with a field `responses` containing an array of objects. Each object should have:
+            - `narrative`: the name from the narrative list.
+            - `formal`: the matching formal artifact id from the second list, or `null` if no match is found.
+        **Constraints:**
+            - Match based on semantic similarity and context; do not rely solely on exact string matching.
+            - Do not modify or paraphrase the names.
+            - Do not include explanations, comments, or Markdown formatting.
+            - Output only valid JSON.
+        """ 
+        llm_additional: GPT = GPT(additional_system_prompt, self.get_api_key(), self.get_model())
+        return (llm, llm_additional)
+
+    def check(self):
+        checks: List[Check] = []
+        artifacts: Dict[str, List] = {artifact_type: [] for artifact_type in self.get_elements()}
+        for page in self.get_ig().get_pages():
+            user_prompt: str = f"\nPage content: {page.get_text()}"
+            response: Optional[str] = self.get_llm().openai_chat_completion_response(user_prompt)
+            if response:
+                try:
+                    response_json = json.loads(response)
+                except:
+                    continue
+                if isinstance(response_json, Dict):
+                    for elem in response_json.keys():
+                        if elem in artifacts.keys():
+                            artifacts[elem] = list(set(artifacts[elem] + response_json[elem]))
+                        else:
+                            print(f"ComparativeArtifactsChecker: invalide artifact type ({elem}) for page {page.get_name()} (LLM error response)")
+        missing: List[str] = []
+        for artifact_type, narrative_artifacts_list in artifacts.items():
+            artifacts_list: List[str] = [artifact.get_id() for artifact in self.get_ig().get_artifacts_type(artifact_type)]
+            if len(artifacts_list) > 0 and len(narrative_artifacts_list) > 0:
+                additional_user_prompt: str = f"\nNarrative artifacts: {narrative_artifacts_list} \nFormal artifacts: {artifacts_list}"
+                response_additional: Optional[str] = self.get_llm_additional().openai_chat_completion_response(additional_user_prompt, ComparativeArtifactsCheckResponses.get_response_format("responses")) #type: ignore
+                if response_additional:
+                    try:
+                        response_json = json.loads(response_additional)
+                    except:
+                        continue
+                    if "responses" in response_json.keys():
+                        response_json = response_json.get("responses")
+                    if isinstance(response_json, list):
+                        for artifact_match in response_json:
+                            if not artifact_match.get("formal") or str(artifact_match.get("normal", "")).lower().strip() in ["none", "null"]:
+                                missing.append(f"{artifact_match['narrative']} ({artifact_type})")
+        value: bool = True
+        proof: Optional[str] = None
+        if len(missing) > 0:
+            value = False
+            proof = self._format_proof(f"No matching artifacts identified for the following elements mentioned in the text", missing)
+        checks.append(Check(f"Artifacts consistency (all artifacts defined in the text are defined): ", value, proof, self.get_domain()))
         return checks
