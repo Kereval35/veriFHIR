@@ -319,7 +319,7 @@ class TextChecker(LLMChecker):
 class ComparativeArtifactsChecker(LLMChecker):
     def __init__(self, ig: FHIRIG, model: str):
         domain: str = "Comparative analysis"
-        elements: List[str] = ["StructureDefinition", "ValueSet", "CodeSystem", "CapabilityStatement", "ConceptMap"] # others to add ?
+        elements: List[str] = ["StructureDefinition", "ValueSet", "CodeSystem", "CapabilityStatement", "ConceptMap", "OperationDefinition"] # others to add (examples) ?
         super().__init__(ig, domain, elements, model) 
 
     def _set_llm(self):
