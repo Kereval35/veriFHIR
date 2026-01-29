@@ -122,7 +122,7 @@ class LLMChecker(Checker):
     def get_llm(self) -> GPT:
         return self._llm
     def get_llm_additional(self) -> Optional[GPT]:
-        return self._llm
+        return self._llm_additional
     
     @abstractmethod
     def _set_llm(self) -> Tuple[GPT, Optional[GPT]]:
