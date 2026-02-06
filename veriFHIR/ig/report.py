@@ -135,6 +135,7 @@ class Report:
             summary_table = str(summary_table_soup)
         )
         output_file: Path= Path(output_path, f"quality-review_{ig_metadata.get_name()}_{now.strftime('%Y-%m-%d-%H-%M')}.html")
+        output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(html_rendered)
         return output_file

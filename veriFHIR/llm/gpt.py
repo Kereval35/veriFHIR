@@ -9,8 +9,10 @@ class GPT:
     
     def get_client(self) -> OpenAI:
         return self._client
+    
     def get_guidelines_prompt(self) -> str:
         return self._guidelines_prompt
+    
     def get_model(self) -> str:
         return self._model
         

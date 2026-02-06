@@ -1,19 +1,20 @@
 import argparse
 
-from veriFHIR.ig.fhir_ig import FHIRIG
-from veriFHIR.checkers.checker_manager import CheckerManager
-from veriFHIR.checkers.checkers import PageTypeChecker, AllPagesChecker, TextChecker, ArtifactsChecker
+from veriFHIR import FHIRIG
+from veriFHIR import CheckerManager
+from veriFHIR import PageTypeChecker, AllPagesChecker, TextChecker, ArtifactsChecker
 from veriFHIR.utils.utils import extract_zip
 
 
 def main():
-    parser = argparse.ArgumentParser(description="veriFHIR project tools")
-    parser.add_argument("--file", type=str, required=True, help="Full IG ZIP file path")
-    parser.add_argument("--output", type=str, required=True, help="Output path")
-    parser.add_argument("--model", type=str, default="gpt-4o-mini", help="OpenAI model name")
+    parser = argparse.ArgumentParser(description="veriFHIR project tools", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--file", type=str, required=True, help="Full IG ZIP file path (type: str)")
+    parser.add_argument("--output", type=str, required=True, help="Output path (type: str)")
+    parser.add_argument("--model", type=str, default="gpt-4o-mini", help="OpenAI model name (type: str)")
     args = parser.parse_args()
 
     print("Starting the review")
+    print("...")
     ig_dir, ig_path = extract_zip(args.file)
     ig = FHIRIG(ig_path)
     manager = CheckerManager()
