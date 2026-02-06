@@ -6,6 +6,7 @@ import json
 import textwrap
 from typing import Tuple, Optional, List, Dict, Tuple
 import re
+from collections import defaultdict
 
 from veriFHIR.ig.fhir_ig import FHIRIG, Artifact
 from veriFHIR.ig.report import Check
@@ -33,6 +34,11 @@ class Checker:
     def _format_proof(self, title: str, elements: List) -> Optional[str]:
         if len(elements) == 0:
             return None
+        if isinstance(elements[0], tuple):
+            temp: Dict = defaultdict(list)
+            for elem in elements:
+                temp[elem[1].strip()].append(elem[0])
+            elements = [(", ".join(vals), key) for key, vals in temp.items()]
         proof_lines: List[str] = [f"{title}: "]
         proof_lines.append("<ul>")
         for elem in elements:
