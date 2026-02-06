@@ -41,7 +41,7 @@ python main.py --file "path/to/your/implementation_guide.zip" --output "path/to/
   * The model must support [structured outputs](https://platform.openai.com/docs/guides/structured-outputs).
   * Default value: gpt-4o-mini
 
-After running the command, VeriFHIR will generate a report in the specified output folder. An example report is available in the [example](./example) folder.
+After running the command, VeriFHIR will generate a report in the specified output folder. An [example report](https://kereval35.github.io/veriFHIR/example/example_report.html) is available in the [example](./example) folder.
 
 # License 📜
 
