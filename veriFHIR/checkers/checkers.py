@@ -5,6 +5,7 @@ from pathlib import Path
 import json
 import textwrap
 from typing import Tuple, Optional, List, Dict, Tuple
+import re
 
 from veriFHIR.ig.fhir_ig import FHIRIG, Artifact
 from veriFHIR.ig.report import Check
@@ -153,8 +154,14 @@ class AllPagesChecker(LLMChecker):
         elem_ids: Dict[str, str] = {elem.strip().lower().replace(" ", "_"): elem for elem in self.get_elements()}
         results_ko: Dict[str, List[str]] = {elem_id: [] for elem_id in elem_ids}
         for page in self.get_ig().get_pages():
-            select_elements: str =  "\n* ".join(elem_ids.keys())
-            user_prompt: str = f"\nElements:\n* {select_elements}\nPage content: {page.get_text()}"
+            elem_ids_page = elem_ids.copy()
+            page_text = page.get_text()
+            if "fhir_version" in elem_ids_page:
+                match = re.search(r'based on fhir\s*[0-6]', page_text, re.IGNORECASE)
+                if match :
+                    del elem_ids_page["fhir_version"]
+            select_elements: str =  "\n* ".join(elem_ids_page.keys())
+            user_prompt: str = f"\nElements:\n* {select_elements}\nPage content: {page_text}"
             response: Optional[str] = self.get_llm().openai_chat_completion_response(user_prompt)
             response_bool: bool = False
             if response:
@@ -165,16 +172,18 @@ class AllPagesChecker(LLMChecker):
                 if isinstance(response_json, dict):
                     response_bool = True
                     for elem_id in results_ko.keys():
-                        bool_value: Optional[bool] = None
-                        for raw_key, raw_value in response_json.items():
-                            key: str = raw_key.strip().lower().replace(" ", "_")
-                            if key == elem_id:
-                                bool_value = self._normalize_bool(raw_value)
-                                break
-                        if bool_value is not True:
-                            results_ko[elem_id].append(page.get_name())
+                        if elem_id in elem_ids_page:
+                            bool_value: Optional[bool] = None
+                            for raw_key, raw_value in response_json.items():
+                                key: str = raw_key.strip().lower().replace(" ", "_")
+                                if key == elem_id:
+                                    bool_value = self._normalize_bool(raw_value)
+                                    break
+                            if bool_value is not True:
+                                results_ko[elem_id].append(page.get_name())
             if not response_bool:
                 print(f"AllPagesChecker: page {page.get_name()} skipped (LLM error response)")
+        
         for elem_id, pages_ko in results_ko.items():
             value: bool = True
             proof: Optional[str] = None 
