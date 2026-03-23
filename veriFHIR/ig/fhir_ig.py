@@ -178,7 +178,7 @@ class FHIRIG():
                         canonicals.append(artifact.get("id"))
             for file in self.get_path().glob("*.json"):
                 content = json.load(codecs.open(str(file), 'r', 'utf-8-sig'))
-                if isinstance(content, dict) and ("id" in artifact.keys() and "resourceType" in content.keys()) and content.get("id") in canonicals:
+                if isinstance(content, dict) and ("id" in content.keys() and "resourceType" in content.keys()) and content.get("id") in canonicals:
                     artifacts.append(Artifact(content["id"], content["resourceType"], file))
         else:
             artifacts_path: Path = Path(self.get_path(), "artifacts")
