@@ -31,7 +31,7 @@ class Checker:
     def check(self) -> List[Check]:
         pass
 
-    def _format_proof(self, title: str, elements: List) -> Optional[str]:
+    def _format_proof(self, title: str, elements: List, reverse: bool = False) -> Optional[str]:
         if len(elements) == 0:
             return None
         if isinstance(elements[0], tuple):
@@ -44,7 +44,7 @@ class Checker:
         for elem in elements:
             if isinstance(elem, str):
                 proof_lines.append(f"<li>{elem}</li>")
-            elif isinstance(elem[1], List):
+            elif isinstance(elem[1], list):
                 proof_lines.append("<li>")
                 proof_lines.append(f"{elem[0]}:")
                 proof_lines.append("<ul>")
@@ -53,7 +53,10 @@ class Checker:
                 proof_lines.append("</ul>")
                 proof_lines.append("</li>")
             else:
-                proof_lines.append(f"<li>{elem[0]}: {elem[1]}</li>")
+                if reverse:
+                    proof_lines.append(f"<li>{elem[1]}: {elem[0]}</li>")
+                else:
+                    proof_lines.append(f"<li>{elem[0]}: {elem[1]}</li>")
         proof_lines.append("</ul>")
         proof: str = "\n".join(proof_lines)
         return proof
@@ -77,14 +80,15 @@ class ArtifactsChecker(Checker):
         domain: str = "Artifacts"
         elements: List[Dict] = [
             {"names": ["text"]},
-            {"names": ["publisher", "contact"], "types": ["ImplementationGuide"]}
+            {"names": ["publisher", "contact"], "types": ["ImplementationGuide"]},
+            {"names": ["description"], "types": ["StructureDefinition"]}
         ]
         super().__init__(ig, domain, elements)
 
     def check(self):
         checks: List[Check] = []
         for elem in self.get_elements():
-            artifacts_ko: List[Tuple[str, List[str]]] = []
+            artifacts_ko: List[Tuple[str, str]] = []
             artifact_types: List[str] = elem.get("types")
             names: List[str] = elem.get("names")
             artifacts: List[Artifact] = [
@@ -99,10 +103,10 @@ class ArtifactsChecker(Checker):
                 for artifact in artifacts:
                     artifact_content: Dict = artifact.get_content()
                     missing = [name for name in names if name not in artifact_content]
-                    if missing:
-                        artifacts_ko.append((artifact.get_id(), missing))
+                    for m in missing:
+                        artifacts_ko.append((m, artifact.get_id()))
                 value = not bool(artifacts_ko)
-                proof = self._format_proof("Missing fields per artifacts", artifacts_ko)
+                proof = self._format_proof("Missing fields per artifacts", artifacts_ko, True)
             names_label: str = "element" if len(names) == 1 else "elements"
             names_str: str = ", ".join(names)
             types_str: str = f"artifacts of type {', '.join(artifact_types)}" if artifact_types else "all artifacts"
