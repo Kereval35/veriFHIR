@@ -31,7 +31,7 @@ class Checker:
     def check(self) -> List[Check]:
         pass
 
-    def _format_proof(self, title: str, elements: List, reverse: bool = False) -> Optional[str]:
+    def _format_proof(self, title: str, elements: List, reverse: bool = False) -> Optional[str]: # TO IMPROVE (check)
         if len(elements) == 0:
             return None
         if isinstance(elements[0], tuple):
@@ -88,13 +88,13 @@ class ArtifactsChecker(Checker):
     def check(self):
         checks: List[Check] = []
         artifacts: List[Artifact] = self.get_ig().get_artifacts()
-        profiles: List[Artifact] = [a for a in artifacts if a.get_content().get("resourceType") == "StructureDefinition"]
+        profiles: List[Artifact] = [a for a in artifacts if a.get_type() == "StructureDefinition"]
         missing_examples = []
-        for profile in profiles:
+        for profile in profiles: # TO IMPROVE (add to elements)
             content: Dict = profile.get_content()
-            resource: Optional[str] = content.get("type")
+            resource: Optional[str] = content.get("type") # TO IMPROVE (add getter)
             url: Optional[str] = content.get("url")
-            examples_resource: List[Artifact] = [a for a in artifacts if a.get_content().get("resourceType") == resource]
+            examples_resource: List[Artifact] = [a for a in artifacts if a.get_type() == resource]
             value_example: bool = False
             for example in examples_resource:
                 example_content: Optional[dict] = example.get_content()
@@ -112,7 +112,7 @@ class ArtifactsChecker(Checker):
             artifact_types: List[str] = elem.get("types")
             names: List[str] = elem.get("names")
             if artifact_types:
-                artifacts_type = [a for a in artifacts if a.get_content().get("resourceType") in artifact_types]
+                artifacts_type = [a for a in artifacts if a.get_type() in artifact_types]
             else:
                 artifacts_type = artifacts
             value: Optional[bool] = None
@@ -341,34 +341,38 @@ class TextChecker(LLMChecker):
 
     def check(self):
         checks: List[Check] = []
-        results: Dict[str, List] = {elem[0]: [] for elem in self.get_elements()}
-        for page in self.get_ig().get_pages():
-            if page.get_name() not in ["artifacts.html", "toc.html"]: #TO IMPROVE
-                response_bool: bool = False
-                select_elements: str =  "\n* ".join(f"{k}: {v}" for k, v in self.get_elements())
-                user_prompt: str = f"\nElements:\n* {select_elements}\nPage content: {page.get_text()}"
-                response: Optional[str] = self.get_llm().openai_chat_completion_response(user_prompt, TextCheckResponses.get_response_format("responses"))
-                if response:
-                    try:
-                        response_json = json.loads(response)
-                    except:
-                        continue
-                    if "responses" in response_json.keys():
-                        response_json = response_json.get("responses")
-                    if isinstance(response_json, list):
-                        for elem_response in response_json:
-                            if all(k in elem_response.keys() for k in ["id", "extract"]):
-                                response_bool = True
-                                id: str = elem_response.get("id")
-                                extract: Optional[str] = elem_response.get("extract")
-                                if extract:
-                                    if id in results.keys():
-                                        if extract.lower().strip() not in ["none", "null"]:
-                                            results[id].append((page.get_name(), extract))
-                                    else:
-                                        response_bool = False
-                if not response_bool:
-                    print(f"TextChecker: page {page.get_name()} skipped (LLM error response)")
+        profiles: List[Artifact] = [a for a in self.get_ig().get_artifacts() if a.get_type() == "StructureDefinition"]
+        profiles_elements: List[Tuple[str, str]] = [(p.get_id(), f"a reference to the profile {p.get_id()} (not just the resource type)") for p in profiles] # TO IMROVE (profile name + text)
+        all_elements: List[Tuple[str, str]] = self.get_elements() + profiles_elements
+        results: Dict[str, List] = {elem[0]: [] for elem in all_elements}
+        for elements in [self.get_elements(), profiles_elements]:
+            for page in self.get_ig().get_pages():
+                if page.get_name() not in ["artifacts.html", "toc.html"]: #TO IMPROVE
+                    response_bool: bool = False
+                    select_elements: str =  "\n* ".join(f"{k}: {v}" for k, v in elements)
+                    user_prompt: str = f"\nElements:\n* {select_elements}\nPage content: {page.get_text()}"
+                    response: Optional[str] = self.get_llm().openai_chat_completion_response(user_prompt, TextCheckResponses.get_response_format("responses"))
+                    if response:
+                        try:
+                            response_json = json.loads(response)
+                        except:
+                            continue
+                        if "responses" in response_json.keys():
+                            response_json = response_json.get("responses")
+                        if isinstance(response_json, list):
+                            for elem_response in response_json:
+                                if all(k in elem_response.keys() for k in ["id", "extract"]):
+                                    response_bool = True
+                                    id: str = elem_response.get("id")
+                                    extract: Optional[str] = elem_response.get("extract")
+                                    if extract:
+                                        if id in results.keys():
+                                            if extract.lower().strip() not in ["none", "null"]:
+                                                results[id].append((page.get_name(), extract))
+                                        else:
+                                            response_bool = False
+                    if not response_bool:
+                        print(f"TextChecker: page {page.get_name()} skipped (LLM error response)")
         for id, elem in self.get_elements():
             value: Optional[bool] = None
             proof: Optional[str] = None
@@ -381,4 +385,17 @@ class TextChecker(LLMChecker):
             else:
                 value = False
             checks.append(Check(f"Presence of {elem}: ", value, proof, self.get_domain()))
+        value_profiles: bool = True
+        proof_profiles: Optional[str] = None
+        result_profiles: List = []
+        for id, _ in profiles_elements:
+            proof_profile: Optional[str] = None
+            if len(results[id]) == 0:
+                value_profiles = False
+                proof_profile = "no reference"
+            else:
+                proof_profile = "pages " + ", ".join([r[0] for r in results[id]])
+            result_profiles.append((id, proof_profile))
+        proof_profiles = self._format_proof("Profile references", result_profiles)
+        checks.append(Check(f"Presence of a reference to each profile: ", value_profiles, proof_profiles, self.get_domain()))
         return checks
