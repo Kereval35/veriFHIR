@@ -4,7 +4,7 @@ import json
 import codecs
 import tarfile
 from bs4 import BeautifulSoup
-from typing import List
+from typing import List, Tuple, Dict
 
 
 class Metadata:
@@ -87,7 +87,7 @@ class Page:
     def __init__(self, path: Path, name: str):
         self._path: Path = path
         self._name: str = name
-        self._text: str = self._parse_page()
+        self._text, self._links = self._parse_page()
 
     def get_path(self) -> Path:
         return self._path
@@ -95,12 +95,15 @@ class Page:
         return self._name
     def get_text(self) -> str:
         return self._text
+    def get_links(self) -> Dict[str, str]:
+        return self._links
 
-    def _parse_page(self) -> str:
+    def _parse_page(self) -> Tuple[str, Dict[str, str]]:
         with open(Path(self.get_path()), 'r', encoding="utf8") as f:
             contents: str = f.read()
         soup: BeautifulSoup = BeautifulSoup(contents, 'html.parser')
-        return soup.get_text()
+        links: Dict[str, str] = {str(a["href"]): a.get_text(strip=True) for a in soup.find_all("a", href=True)}
+        return soup.get_text(), links
 
 
 class FHIRIG():

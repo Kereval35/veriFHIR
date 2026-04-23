@@ -110,6 +110,33 @@ class ArtifactsChecker(Checker):
         return checks
 
 
+class RefsChecker(Checker):
+    def __init__(self, ig: FHIRIG):
+        domain: str = "Pages and organization"
+        elements: List[Tuple[str, str]] = [
+            ("qa.html", "the validation results (QA)")
+        ]
+        super().__init__(ig, domain, elements)
+
+    def check(self):
+        checks: List[Check] = []
+        if self.get_ig().get_metadata().get_ig_type() == "IGPublisher":
+            for ref, ref_desc in self.get_elements():
+                refs: List = []
+                for page in self.get_ig().get_pages():
+                    pages_refs: Dict[str, str] = page.get_links()
+                    for page_ref, page_ref_desc in pages_refs.items():
+                        if ref in page_ref:
+                            refs.append((page.get_name(), f"{page_ref_desc} ({page_ref})"))
+                value: bool = False
+                proof: Optional[str] = None
+                if len(refs) > 0:
+                    value = True
+                    proof = self._format_proof("Extract per page: ", refs)
+                checks.append(Check(f"Presence of at least a reference to {ref_desc}", value, proof, self.get_domain()))
+        return checks
+
+
 class LLMChecker(Checker):
     def __init__(self, ig: FHIRIG, domain: str, elements: List, model: str):
         super().__init__(ig, domain, elements) 

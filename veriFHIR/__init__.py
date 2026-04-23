@@ -1,6 +1,6 @@
 from veriFHIR.ig.fhir_ig import FHIRIG
 from veriFHIR.checkers.checker_manager import CheckerManager
-from veriFHIR.checkers.checkers import PageTypeChecker, AllPagesChecker, TextChecker, ArtifactsChecker
+from veriFHIR.checkers.checkers import PageTypeChecker, AllPagesChecker, TextChecker, ArtifactsChecker, RefsChecker
 
 __all__ = [
     "FHIRIG",
@@ -8,5 +8,6 @@ __all__ = [
     "PageTypeChecker",
     "AllPagesChecker", 
     "TextChecker",
-    "ArtifactsChecker"
+    "ArtifactsChecker",
+    "RefsChecker"
 ]

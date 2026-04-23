@@ -2,7 +2,7 @@ import argparse
 
 from veriFHIR import FHIRIG
 from veriFHIR import CheckerManager
-from veriFHIR import PageTypeChecker, AllPagesChecker, TextChecker, ArtifactsChecker
+from veriFHIR import PageTypeChecker, AllPagesChecker, TextChecker, ArtifactsChecker, RefsChecker
 from veriFHIR.utils.utils import extract_zip
 
 
@@ -22,6 +22,7 @@ def main():
     manager.register(AllPagesChecker(ig, args.model))
     manager.register(TextChecker(ig, args.model))
     manager.register(ArtifactsChecker(ig))
+    manager.register(RefsChecker(ig))
     report = manager.check()
     output_file = report.write(args.output, ig.get_metadata())
     ig_dir.cleanup()
