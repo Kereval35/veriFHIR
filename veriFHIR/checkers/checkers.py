@@ -87,20 +87,40 @@ class ArtifactsChecker(Checker):
 
     def check(self):
         checks: List[Check] = []
+        artifacts: List[Artifact] = self.get_ig().get_artifacts()
+        profiles: List[Artifact] = [a for a in artifacts if a.get_content().get("resourceType") == "StructureDefinition"]
+        missing_examples = []
+        for profile in profiles:
+            content: Dict = profile.get_content()
+            resource: Optional[str] = content.get("type")
+            url: Optional[str] = content.get("url")
+            examples_resource: List[Artifact] = [a for a in artifacts if a.get_content().get("resourceType") == resource]
+            value_example: bool = False
+            for example in examples_resource:
+                example_content: Optional[dict] = example.get_content()
+                meta: Optional[dict] = example_content.get("meta") if example_content else None
+                example_profiles: Optional[list] = meta.get("profile") if isinstance(meta, dict) else None
+                if example_profiles and url in example_profiles:
+                    value_example = True
+                    break
+            if not value_example:
+                missing_examples.append(content.get("id"))
+        proof_example: Optional[str] = self._format_proof("Missing example for profile(s): ",  missing_examples)
+        checks.append(Check(f"Presence of at least one example for each profile: ", value_example, proof_example, self.get_domain()))
         for elem in self.get_elements():
             artifacts_ko: List[Tuple[str, str]] = []
             artifact_types: List[str] = elem.get("types")
             names: List[str] = elem.get("names")
-            artifacts: List[Artifact] = [
-                a for a in self.get_ig().get_artifacts()
-                if not artifact_types or a.get_content().get("resourceType") in artifact_types
-            ]
+            if artifact_types:
+                artifacts_type = [a for a in artifacts if a.get_content().get("resourceType") in artifact_types]
+            else:
+                artifacts_type = artifacts
             value: Optional[bool] = None
             proof: Optional[str] = None
-            if not artifacts:
+            if not artifacts_type:
                 proof = "No artifacts found for this type."
             else:
-                for artifact in artifacts:
+                for artifact in artifacts_type:
                     artifact_content: Dict = artifact.get_content()
                     missing = [name for name in names if name not in artifact_content]
                     for m in missing:
@@ -137,7 +157,7 @@ class RefsChecker(Checker):
                 if len(refs) > 0:
                     value = True
                     proof = self._format_proof("Extract per page: ", refs)
-                checks.append(Check(f"Presence of at least a reference to {ref_desc}", value, proof, self.get_domain()))
+                checks.append(Check(f"Presence of at least one reference to {ref_desc}", value, proof, self.get_domain()))
         return checks
 
 

@@ -172,16 +172,9 @@ class FHIRIG():
     def _load_artifacts(self) -> List[Artifact]:
         artifacts: List[Artifact] = []
         if self.get_metadata().get_ig_type() == "IGPublisher":
-            canonicals_path: Path = Path(self.get_path(), "canonicals.json")
-            canonicals = []
-            if canonicals_path.is_file():
-                content = json.load(codecs.open(str(canonicals_path), 'r', 'utf-8-sig'))
-                if isinstance(content, List):
-                    for artifact in content:
-                        canonicals.append(artifact.get("id"))
             for file in self.get_path().glob("*.json"):
                 content = json.load(codecs.open(str(file), 'r', 'utf-8-sig'))
-                if isinstance(content, dict) and ("id" in content.keys() and "resourceType" in content.keys()) and content.get("id") in canonicals:
+                if isinstance(content, dict) and ("id" in content.keys() and "resourceType" in content.keys()):
                     artifacts.append(Artifact(content["id"], content["resourceType"], file))
         else:
             artifacts_path: Path = Path(self.get_path(), "artifacts")
