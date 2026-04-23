@@ -320,7 +320,8 @@ class TextChecker(LLMChecker):
             ("relationship", "an explanation of the relationship of the IG to any other guides"),
             ("registry", "a reference to the IG registry as a location to find more IGs of interest"),
             ("background", "background information providing context and motivation for the IG"),
-            ("downloads", "information on how to access downloadable artifacts and resources")
+            ("downloads", "information on how to access downloadable artifacts and resources"), 
+            ("examples", "explicit reference within the narrative text to concrete example resources demonstrating how to use the IG in practice (not just a dedicated 'Examples' section)")
         ]
         super().__init__(ig, domain, elements, model) 
 
@@ -342,31 +343,32 @@ class TextChecker(LLMChecker):
         checks: List[Check] = []
         results: Dict[str, List] = {elem[0]: [] for elem in self.get_elements()}
         for page in self.get_ig().get_pages():
-            response_bool: bool = False
-            select_elements: str =  "\n* ".join(f"{k}: {v}" for k, v in self.get_elements())
-            user_prompt: str = f"\nElements:\n* {select_elements}\nPage content: {page.get_text()}"
-            response: Optional[str] = self.get_llm().openai_chat_completion_response(user_prompt, TextCheckResponses.get_response_format("responses"))
-            if response:
-                try:
-                    response_json = json.loads(response)
-                except:
-                    continue
-                if "responses" in response_json.keys():
-                    response_json = response_json.get("responses")
-                if isinstance(response_json, list):
-                    for elem_response in response_json:
-                        if all(k in elem_response.keys() for k in ["id", "extract"]):
-                            response_bool = True
-                            id: str = elem_response.get("id")
-                            extract: Optional[str] = elem_response.get("extract")
-                            if extract:
-                                if id in results.keys():
-                                    if extract.lower().strip() not in ["none", "null"]:
-                                        results[id].append((page.get_name(), extract))
-                                else:
-                                    response_bool = False
-            if not response_bool:
-                print(f"TextChecker: page {page.get_name()} skipped (LLM error response)")
+            if page.get_name() not in ["artifacts.html", "toc.html"]: #TO IMPROVE
+                response_bool: bool = False
+                select_elements: str =  "\n* ".join(f"{k}: {v}" for k, v in self.get_elements())
+                user_prompt: str = f"\nElements:\n* {select_elements}\nPage content: {page.get_text()}"
+                response: Optional[str] = self.get_llm().openai_chat_completion_response(user_prompt, TextCheckResponses.get_response_format("responses"))
+                if response:
+                    try:
+                        response_json = json.loads(response)
+                    except:
+                        continue
+                    if "responses" in response_json.keys():
+                        response_json = response_json.get("responses")
+                    if isinstance(response_json, list):
+                        for elem_response in response_json:
+                            if all(k in elem_response.keys() for k in ["id", "extract"]):
+                                response_bool = True
+                                id: str = elem_response.get("id")
+                                extract: Optional[str] = elem_response.get("extract")
+                                if extract:
+                                    if id in results.keys():
+                                        if extract.lower().strip() not in ["none", "null"]:
+                                            results[id].append((page.get_name(), extract))
+                                    else:
+                                        response_bool = False
+                if not response_bool:
+                    print(f"TextChecker: page {page.get_name()} skipped (LLM error response)")
         for id, elem in self.get_elements():
             value: Optional[bool] = None
             proof: Optional[str] = None
