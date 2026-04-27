@@ -79,7 +79,7 @@ class ArtifactsChecker(Checker):
     def __init__(self, ig: FHIRIG):
         domain: str = "Artifacts"
         elements: List[Dict] = [
-            {"names": ["text"]},
+            {"names": ["text"]}, # TO IMPROVE (id ?)
             {"names": ["publisher", "contact"], "types": ["ImplementationGuide"]},
             {"names": ["description"], "types": ["StructureDefinition"]}
         ]
@@ -88,6 +88,49 @@ class ArtifactsChecker(Checker):
     def check(self):
         checks: List[Check] = []
         artifacts: List[Artifact] = self.get_ig().get_artifacts()
+
+        # TO IMPROVE (espaces + ANS)
+        formats: Dict[str, Dict[str, str]] = {
+                "id": {"regex": r'^[a-z0-9]+(-[a-z0-9]+)*$', "name": "kebab-case"},
+                "name": {"regex": r'^(?=[A-Z])(?=(?:.*[A-Z]){2,})(?=.*[a-z])[A-Za-z0-9]+$', "name": "PascalCase"},
+                "title": {"regex":r"^[a-zA-Z0-9 ]+$", "name": "alphanumeric + space only"},
+                "id-name": {}, 
+                "name-title": {}
+            }
+        format_results: Dict[str, Dict[str, bool]] = {}
+        for artifact in artifacts:
+            artifact_id: str = artifact.get_id()
+            artifact_content: Dict = artifact.get_content()
+            format_results[artifact_id] = {}
+            for element, format in formats.items():
+                artifact_element: Optional[str] = artifact_content.get(element)
+                if artifact_element and isinstance(artifact_element, str): # TO IMPROVE (cas None + mutualiser type artifact)
+                    format_results[artifact_id][element] = bool(re.fullmatch(format["regex"], artifact_element))
+            if format_results[artifact_id].get("id") and format_results[artifact_id].get("name"):
+                format_results[artifact_id]["id-name"] = True
+                if artifact_id.replace("-", "").lower() != artifact_content.get("name").lower(): #type: ignore
+                    format_results[artifact_id]["id-name"] = False
+            if format_results[artifact_id].get("name") and format_results[artifact_id].get("title"):
+                format_results[artifact_id]["name-title"] = True
+                if artifact_content.get("name").lower() != artifact_content.get("title").replace(" ", ""): #type: ignore
+                    format_results[artifact_id]["name-title"] = False
+                    
+        for element in formats.keys():
+            invalid_artifacts: List[str] = []
+            for artifact_id, result in format_results.items():
+                if result.get(element) == False: # TO IMPROVE (cas None pour tous les artifacts)
+                    invalid_artifacts.append(artifact_id)
+            value_format: bool = not invalid_artifacts
+            proof_format: Optional[str] = None
+            if "-" in element:
+                if not value_format:
+                    proof_format = self._format_proof(f"Artifacts with {element} mismatches", invalid_artifacts)
+                checks.append(Check(f"Artifact {element} match: ", value_format, proof_format, self.get_domain())) # TO IMPROVE
+            else:
+                if not value_format:
+                    proof_format = self._format_proof(f"Artifacts with invalid {element} format", invalid_artifacts)
+                checks.append(Check(f"Artifact {element} in {formats[element]['name']} format: ", value_format, proof_format, self.get_domain()))
+
         profiles: List[Artifact] = [a for a in artifacts if a.get_type() == "StructureDefinition"]
         missing_examples = []
         for profile in profiles: # TO IMPROVE (add to elements)
@@ -107,6 +150,7 @@ class ArtifactsChecker(Checker):
                 missing_examples.append(content.get("id"))
         proof_example: Optional[str] = self._format_proof("Missing example for profile(s): ",  missing_examples)
         checks.append(Check(f"Presence of at least one example for each profile: ", value_example, proof_example, self.get_domain()))
+
         for elem in self.get_elements():
             artifacts_ko: List[Tuple[str, str]] = []
             artifact_types: List[str] = elem.get("types")
@@ -121,7 +165,7 @@ class ArtifactsChecker(Checker):
                 proof = "No artifacts found for this type."
             else:
                 for artifact in artifacts_type:
-                    artifact_content: Dict = artifact.get_content()
+                    artifact_content = artifact.get_content()
                     missing = [name for name in names if name not in artifact_content]
                     for m in missing:
                         artifacts_ko.append((m, artifact.get_id()))
