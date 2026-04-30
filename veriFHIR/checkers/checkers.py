@@ -451,3 +451,85 @@ class TextChecker(LLMChecker):
                 proof_artifacts = self._format_proof(f"{name} references", result_artifacts) # TO IMPROVE (title)
             checks.append(Check(f"Presence of a reference to each {name}: ", value_artifacts, proof_artifacts, self.get_domain()))
         return checks
+    
+
+class AmbiguousWordingChecker(LLMChecker):
+    def __init__(self, ig: FHIRIG, model: str):
+        domain: str = "Writing and narrative"
+        elements: List = []
+        super().__init__(ig, domain, elements, model) 
+
+    def _set_llm(self): # TO IMPROVE (harmonisation prompt)
+        system_prompt: str = """
+        Given the content of a FHIR Implementation Guide page, identify ONLY high-confidence technical ambiguities that would likely lead to incorrect implementation.
+
+        - Evaluate statements in the context of the entire page.
+        - Consider ONLY ambiguities that would force an implementer to make an uncertain or conflicting technical decision.
+
+        ### STRICT FILTER (very important):
+        Do NOT report anything unless ALL conditions are met:
+        - The ambiguity directly affects FHIR implementation behavior (not interpretation, not documentation clarity)
+        - It leads to at least two plausible but conflicting implementations
+        - It cannot be resolved from surrounding context in the page
+        - It concerns normative or constraint-bearing content (e.g. MUST/SHOULD/MAY, cardinality, profiles, bindings, invariants)
+
+        ### EXCLUDE COMPLETELY:
+        - vague wording without implementation consequences
+        - editorial or explanatory ambiguity
+        - unclear but non-actionable statements
+        - anything resolvable by reading the rest of the section
+        - structural or formatting issues
+        - fragments, headings, labels, identifiers, or metadata
+
+        ### ONLY ACCEPTABLE TYPES OF AMBIGUITY:
+        - conflicting or unclear cardinality constraints
+        - unclear binding strength or terminology usage
+        - ambiguous slicing or profiling rules
+        - unclear invariants or conditional constraints
+        - conflicting MUST/SHOULD/MAY interpretation within the page
+
+        **Output format:**  
+        Return a JSON object:
+        {"responses": [...]}
+
+        Each object contains:
+        - `extract`: exact text excerpt (verbatim)
+        - `reason`: why this creates a concrete implementation conflict
+
+        If nothing meets ALL criteria:
+        {"responses": []}
+
+        **Constraints:**
+        - No paraphrasing of excerpts
+        - Only return validated, high-impact technical ambiguities
+        - Output only valid JSON
+        """
+        llm: GPT = GPT(textwrap.dedent(system_prompt), self.get_api_key(), self.get_model())
+        return (llm, None)
+    
+    def check(self):
+        results: List[Tuple[str, str]] = []
+        value: Optional[bool] = None
+        proof: Optional[str] = None
+        for page in self.get_ig().get_pages():
+            page_name = page.get_name()
+            user_prompt: str = f"Page content: {page.get_text()}"
+            response: Optional[str] = self.get_llm().openai_chat_completion_response(user_prompt, TextCheckResponses.get_response_format("responses"))
+            if response:
+                try:
+                    response_json = json.loads(response)
+                except:
+                    continue
+                if "responses" in response_json.keys():
+                    response_json = response_json.get("responses")
+                if isinstance(response_json, list):
+                    for elem_response in response_json:
+                        if all(k in elem_response.keys() for k in ["extract", "reason"]):
+                            results.append((page_name, f"{elem_response['extract']} ({elem_response['reason']})")) # TO IMPROVE
+        if len(results) > 0:
+            value = False
+            proof = self._format_proof("Ambiguous or unclear technical formulations", results)
+        else:
+            value = True
+        checks: List[Check] = [Check(f"Clarity for technical implementation: ", value, proof, self.get_domain())]
+        return checks

@@ -2,7 +2,7 @@ import argparse
 
 from veriFHIR import FHIRIG
 from veriFHIR import CheckerManager
-from veriFHIR import PageTypeChecker, AllPagesChecker, TextChecker, ArtifactsChecker, RefsChecker
+from veriFHIR import PageTypeChecker, AllPagesChecker, TextChecker, ArtifactsChecker, RefsChecker, AmbiguousWordingChecker
 from veriFHIR.utils.utils import extract_zip
 
 
@@ -21,6 +21,7 @@ def main():
     manager.register(PageTypeChecker(ig, args.model))
     manager.register(AllPagesChecker(ig, args.model))
     manager.register(TextChecker(ig, args.model))
+    manager.register(AmbiguousWordingChecker(ig, args.model))
     manager.register(ArtifactsChecker(ig))
     manager.register(RefsChecker(ig))
     report = manager.check()
