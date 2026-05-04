@@ -4,7 +4,7 @@ import json
 import codecs
 import tarfile
 from bs4 import BeautifulSoup
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 
 
 class Metadata:
@@ -52,15 +52,15 @@ class Metadata:
 
 
 class Artifact:
-    def __init__(self, id: str, type: str, path: Path):
+    def __init__(self, id: str, resource_type: str, path: Path):
         self._id: str = id
-        self._type: str = type
+        self._resource_type: str = resource_type
         self._path: Path = path
 
     def get_id(self) -> str:
         return self._id
-    def get_type(self) -> str:
-        return self._type
+    def get_resource_type(self) -> str:
+        return self._resource_type
     def get_path(self) -> Path:
         return self._path
     
@@ -129,7 +129,7 @@ class FHIRIG():
     def get_artifacts(self) -> List[Artifact]:
         return self._artifacts
     def get_artifacts_type(self, type: str) -> List[Artifact]:
-        return [artifact for artifact in self.get_artifacts() if artifact.get_type() == type]
+        return [artifact for artifact in self.get_artifacts() if artifact.get_resource_type() == type]
     def get_mustSupport(self) -> bool:
         return self._mustSupport
 

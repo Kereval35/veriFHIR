@@ -7,6 +7,7 @@ import textwrap
 from typing import Tuple, Optional, List, Dict, Tuple
 import re
 from collections import defaultdict
+from itertools import combinations
 
 from veriFHIR.ig.fhir_ig import FHIRIG, Artifact
 from veriFHIR.ig.report import Check
@@ -79,7 +80,7 @@ class ArtifactsChecker(Checker):
     def __init__(self, ig: FHIRIG):
         domain: str = "Artifacts"
         elements: List[Dict] = [
-            {"names": ["text"]}, # TO IMPROVE (id ?)
+            {"names": ["id", "text"]},
             {"names": ["publisher", "contact"], "types": ["ImplementationGuide"]},
             {"names": ["description"], "types": ["StructureDefinition"]}
         ]
@@ -91,72 +92,75 @@ class ArtifactsChecker(Checker):
 
         # TO IMPROVE (espaces + ANS)
         formats: Dict[str, Dict[str, str]] = {
-                "id": {"regex": r'^[a-z0-9]+(-[a-z0-9]+)*$', "name": "kebab-case"},
-                "name": {"regex": r'^(?=[A-Z])(?=(?:.*[A-Z]){2,})(?=.*[a-z])[A-Za-z0-9]+$', "name": "PascalCase"},
-                "title": {"regex":r"^[a-zA-Z0-9 ]+$", "name": "alphanumeric + space only"},
-                "id-name": {}, 
-                "name-title": {}
-            }
-        format_results: Dict[str, Dict[str, bool]] = {}
+            "id": {"regex": r'^[a-z0-9]+(-[a-z0-9]+)*$', "name": "kebab-case"},
+            "name": {"regex": r'^(?=[A-Z])(?=(?:.*[A-Z]){2,})(?=.*[a-z])[A-Za-z0-9]+$', "name": "PascalCase"},
+            "title": {"regex": r'^[a-zA-Z0-9 ]+$', "name": "alphanumeric + space only"}
+            } # TO IMPROVE (paramétrer match)
+        format_results: Dict[str, List] = {format: [] for format in formats.keys()}
+        format_results["MATCH"] = []
         for artifact in artifacts:
-            artifact_id: str = artifact.get_id()
             artifact_content: Dict = artifact.get_content()
-            format_results[artifact_id] = {}
+            artifact_match: Dict[str, Optional[str]] = {f: None for f in formats.keys()}
             for element, format in formats.items():
                 artifact_element: Optional[str] = artifact_content.get(element)
-                if artifact_element and isinstance(artifact_element, str): # TO IMPROVE (cas None + mutualiser type artifact)
-                    format_results[artifact_id][element] = bool(re.fullmatch(format["regex"], artifact_element))
-            if format_results[artifact_id].get("id") and format_results[artifact_id].get("name"):
-                format_results[artifact_id]["id-name"] = True
-                if artifact_id.replace("-", "").lower() != artifact_content.get("name").lower(): #type: ignore
-                    format_results[artifact_id]["id-name"] = False
-            if format_results[artifact_id].get("name") and format_results[artifact_id].get("title"):
-                format_results[artifact_id]["name-title"] = True
-                if artifact_content.get("name").lower() != artifact_content.get("title").replace(" ", ""): #type: ignore
-                    format_results[artifact_id]["name-title"] = False
-                    
-        for element in formats.keys():
-            invalid_artifacts: List[str] = []
-            for artifact_id, result in format_results.items():
-                if result.get(element) == False: # TO IMPROVE (cas None pour tous les artifacts)
-                    invalid_artifacts.append(artifact_id)
-            value_format: bool = not invalid_artifacts
-            proof_format: Optional[str] = None
-            if "-" in element:
-                if not value_format:
-                    proof_format = self._format_proof(f"Artifacts with {element} mismatches", invalid_artifacts)
-                checks.append(Check(f"Artifact {element} match: ", value_format, proof_format, self.get_domain())) # TO IMPROVE
-            else:
-                if not value_format:
-                    proof_format = self._format_proof(f"Artifacts with invalid {element} format", invalid_artifacts)
-                checks.append(Check(f"Artifact {element} in {formats[element]['name']} format: ", value_format, proof_format, self.get_domain()))
+                if artifact_element and isinstance(artifact_element, str):
+                    if not bool(re.fullmatch(format["regex"], artifact_element)):
+                        format_results[element].append(artifact_content.get(element))
+                    else:
+                        artifact_match[element] = artifact_element.lower().replace("-", "").replace(" ", "")
+            mismatch: List[Tuple[str, str]] = []
+            for k1, k2 in combinations(artifact_match.keys(), 2):
+                if artifact_match[k1] and artifact_match[k2]:
+                    if artifact_match[k1] != artifact_match[k2]:
+                        print(k1, k2)
+                        print(artifact_match[k1], artifact_match[k2])
+                        mismatch.append((k1, k2))
+            if len(mismatch) > 0:
+                element_values: str = ", ".join(f"{m}: {artifact_content.get(m)}" for m in formats.keys())
+                mismatch_values = ", ".join(f"{m[0]}/{m[1]}" for m in mismatch)
+                format_results["MATCH"].append(f"{element_values} ({mismatch_values})")
 
-        profiles: List[Artifact] = [a for a in artifacts if a.get_type() == "StructureDefinition"]
+        for element, result in format_results.items():
+            value_format: bool = True
+            proof_format: Optional[str] = None
+            title: str = "Artifacts id-name/title match:" if element == "MATCH" else f"Artifact {element} in {formats[element]['name']} format: "
+            proof_title: str = "Artifacts with mismatches" if element == "MATCH" else f"Artifacts with invalid {element} format"
+            if len(result) > 0:
+                value_format = False
+                proof_format = self._format_proof(proof_title, result)
+            checks.append(Check(title, value_format, proof_format, self.get_domain())) 
+
         missing_examples = []
+        profiles = [artifact for artifact in self.get_ig().get_artifacts_type("StructureDefinition") if artifact.get_content().get("kind") == "resource"]
         for profile in profiles: # TO IMPROVE (add to elements)
             content: Dict = profile.get_content()
-            resource: Optional[str] = content.get("type") # TO IMPROVE (add getter)
+            resource: Optional[str] = content.get("type")
             url: Optional[str] = content.get("url")
-            examples_resource: List[Artifact] = [a for a in artifacts if a.get_type() == resource]
-            value_example: bool = False
-            for example in examples_resource:
-                example_content: Optional[dict] = example.get_content()
-                meta: Optional[dict] = example_content.get("meta") if example_content else None
-                example_profiles: Optional[list] = meta.get("profile") if isinstance(meta, dict) else None
-                if example_profiles and url in example_profiles:
-                    value_example = True
-                    break
-            if not value_example:
-                missing_examples.append(content.get("id"))
-        proof_example: Optional[str] = self._format_proof("Missing example for profile(s): ",  missing_examples)
-        checks.append(Check(f"Presence of at least one example for each profile: ", value_example, proof_example, self.get_domain()))
+            if resource:
+                examples_resource: List[Artifact] = self.get_ig().get_artifacts_type(resource)
+                value_example: bool = False
+                for example in examples_resource:
+                    example_content: Optional[dict] = example.get_content()
+                    meta: Optional[dict] = example_content.get("meta") if example_content else None
+                    example_profiles: Optional[list] = meta.get("profile") if isinstance(meta, dict) else None
+                    if example_profiles and url in example_profiles:
+                        value_example = True
+                        break
+                if not value_example:
+                    missing_examples.append(content.get("id"))
+        proof_examples: Optional[str] = None
+        value_examples: bool = True
+        if len(missing_examples) > 0:
+            value_examples = False
+            proof_examples = self._format_proof("Missing example for profile(s): ",  missing_examples)
+        checks.append(Check(f"Presence of at least one example for each profile: ", value_examples, proof_examples, self.get_domain()))
 
         for elem in self.get_elements():
             artifacts_ko: List[Tuple[str, str]] = []
             artifact_types: List[str] = elem.get("types")
             names: List[str] = elem.get("names")
             if artifact_types:
-                artifacts_type = [a for a in artifacts if a.get_type() in artifact_types]
+                artifacts_type = [a for a in artifacts if a.get_resource_type() in artifact_types]
             else:
                 artifacts_type = artifacts
             value: Optional[bool] = None
@@ -242,9 +246,11 @@ class AllPagesChecker(LLMChecker):
         Given the content of a FHIR Implementation Guide page and a list of information, identify for each piece of information whether it appears in the page.
             - If the information appears, return true.
             - If it does not appear, return false.
+
         **Output format:** Produce a single valid JSON object where each key is the exact information label and each value is either true or false.
+        
         **Constraints:**
-            - Do not include explanations, comments, or Markdown formatting.
+            - Do not include additional explanations, comments, or Markdown formatting.
             - Output only valid JSON.
         """      
         llm: GPT = GPT(system_prompt, self.get_api_key(), self.get_model())
@@ -372,22 +378,28 @@ class TextChecker(LLMChecker):
     def _set_llm(self):
         system_prompt: str = """
         Given the content of a FHIR Implementation Guide page and a list of elements (each with a unique `id` and a `description`), identify for each element whether it appears in the page.
-            - If the element appears, return a short excerpt showing where and how the element appears in the page.
-            - If it does not appear, return `null`.
+        - If the element appears, return a short excerpt showing where and how the element appears in the page.
+        - If it does not appear, return `null`.
+
         **Output format:** For each element, produce an object containing the element id (`id`) and the excerpt string, if found, or null (`extract`). The output must be a single valid JSON object with a field `responses` containing an array of such objects.
+        Return a JSON object:
+        {"responses": [...]}
+        Each object contains:
+        - `id`: element id
+        - `extract`: exact text excerpt if found (verbatim), or null
+
         **Constraints:**
-            - The excerpt must be taken directly from the page text without any modifications, paraphrasing, or additions.
-            - Do not include explanations, comments, or Markdown formatting.
-            - Output only valid JSON.
+        - Output only valid JSON.
+        - The excerpt must be taken directly from the page text without any modifications, paraphrasing, or additions.
         """ 
         llm: GPT = GPT(textwrap.dedent(system_prompt), self.get_api_key(), self.get_model())
         return (llm, None)
 
     def check(self):
         checks: List[Check] = []
-        profiles: List[Artifact] = [a for a in self.get_ig().get_artifacts() if a.get_type() == "StructureDefinition"]
+        profiles: List[Artifact] = self.get_ig().get_artifacts_type("StructureDefinition")
         profiles_elements: List[Tuple[str, str]] = [(p.get_id(), f"a reference to the profile {p.get_id()} (not just the resource type)") for p in profiles] # TO IMPROVE (profile name + text)
-        sps: List[Artifact] = [a for a in self.get_ig().get_artifacts() if a.get_type() == "SearchParameter"]
+        sps: List[Artifact] = self.get_ig().get_artifacts_type("SearchParameter")
         sps_elements: List[Tuple[str, str]] = [(p.get_id(), f"a reference to the search parameter {p.get_id()}") for p in sps] # TO IMPROVE (profile name + text)
         all_elements: List[Tuple[str, str]] = self.get_elements() + profiles_elements + sps_elements
         results: Dict[str, List] = {elem[0]: [] for elem in all_elements}
@@ -459,20 +471,17 @@ class AmbiguousWordingChecker(LLMChecker):
         elements: List = []
         super().__init__(ig, domain, elements, model) 
 
-    def _set_llm(self): # TO IMPROVE (harmonisation prompt)
+    def _set_llm(self):
         system_prompt: str = """
         Given the content of a FHIR Implementation Guide page, identify ONLY high-confidence technical ambiguities that would likely lead to incorrect implementation.
-
         - Evaluate statements in the context of the entire page.
         - Consider ONLY ambiguities that would force an implementer to make an uncertain or conflicting technical decision.
-
         ### STRICT FILTER (very important):
         Do NOT report anything unless ALL conditions are met:
         - The ambiguity directly affects FHIR implementation behavior (not interpretation, not documentation clarity)
         - It leads to at least two plausible but conflicting implementations
         - It cannot be resolved from surrounding context in the page
         - It concerns normative or constraint-bearing content (e.g. MUST/SHOULD/MAY, cardinality, profiles, bindings, invariants)
-
         ### EXCLUDE COMPLETELY:
         - vague wording without implementation consequences
         - editorial or explanatory ambiguity
@@ -480,7 +489,6 @@ class AmbiguousWordingChecker(LLMChecker):
         - anything resolvable by reading the rest of the section
         - structural or formatting issues
         - fragments, headings, labels, identifiers, or metadata
-
         ### ONLY ACCEPTABLE TYPES OF AMBIGUITY:
         - conflicting or unclear cardinality constraints
         - unclear binding strength or terminology usage
@@ -491,18 +499,16 @@ class AmbiguousWordingChecker(LLMChecker):
         **Output format:**  
         Return a JSON object:
         {"responses": [...]}
-
         Each object contains:
         - `extract`: exact text excerpt (verbatim)
         - `reason`: why this creates a concrete implementation conflict
-
         If nothing meets ALL criteria:
         {"responses": []}
 
         **Constraints:**
-        - No paraphrasing of excerpts
+        - Output only valid JSON.
+        - The excerpt must be taken directly from the page text without any modifications, paraphrasing, or additions.
         - Only return validated, high-impact technical ambiguities
-        - Output only valid JSON
         """
         llm: GPT = GPT(textwrap.dedent(system_prompt), self.get_api_key(), self.get_model())
         return (llm, None)
