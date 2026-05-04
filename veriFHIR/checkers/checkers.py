@@ -68,7 +68,7 @@ class Checker:
         if value is False:
             return False
         if isinstance(value, str):
-            v = value.strip().lower()
+            v: str = value.strip().lower()
             if v == "true":
                 return True
             if v == "false":
@@ -79,7 +79,7 @@ class Checker:
 class ArtifactsChecker(Checker):
     def __init__(self, ig: FHIRIG, check_format: bool = True, check_examples: bool = True):
         domain: str = "Artifacts"
-        elements: List[Dict] = [
+        elements: List[Dict[str, List[str]]] = [
             {"names": ["id", "text"]},
             {"names": ["publisher", "contact"], "types": ["ImplementationGuide"]},
             {"names": ["description"], "types": ["StructureDefinition"]}
@@ -92,6 +92,57 @@ class ArtifactsChecker(Checker):
         checks: List[Check] = []
         artifacts: List[Artifact] = self.get_ig().get_artifacts()
 
+        for elem in self.get_elements():
+            artifacts_ko: List[Tuple[str, str]] = []
+            artifact_types: List[str] = elem.get("types")
+            names: List[str] = elem.get("names")
+            if artifact_types:
+                artifacts_type = [a for a in artifacts if a.get_resource_type() in artifact_types]
+            else:
+                artifacts_type = artifacts
+            value: Optional[bool] = None
+            proof: Optional[str] = None
+            if not artifacts_type:
+                proof = "No artifacts found for this type."
+            else:
+                for artifact in artifacts_type:
+                    artifact_content: Dict = artifact.get_content()
+                    missing = [name for name in names if name not in artifact_content]
+                    for m in missing:
+                        artifacts_ko.append((m, artifact.get_id()))
+                value = not bool(artifacts_ko)
+                proof = self._format_proof("Missing fields per artifacts", artifacts_ko, True)
+            names_label: str = "element" if len(names) == 1 else "elements"
+            names_str: str = ", ".join(names)
+            types_str: str = f"artifacts of type {', '.join(artifact_types)}" if artifact_types else "all artifacts"
+            checks.append(Check(f"Presence of {names_label} {names_str} in {types_str}: ", value, proof, self.get_domain()))
+
+        if self._check_examples:
+            missing_examples: List = []
+            profiles: List[Artifact] = [artifact for artifact in self.get_ig().get_artifacts_type("StructureDefinition") if artifact.get_content().get("kind") == "resource"]
+            for profile in profiles:
+                content: Dict = profile.get_content()
+                resource: Optional[str] = content.get("type")
+                url: Optional[str] = content.get("url")
+                if resource:
+                    examples_resource: List[Artifact] = self.get_ig().get_artifacts_type(resource)
+                    value_example: bool = False
+                    for example in examples_resource:
+                        example_content: Optional[dict] = example.get_content()
+                        meta: Optional[dict] = example_content.get("meta") if example_content else None
+                        example_profiles: Optional[list] = meta.get("profile") if isinstance(meta, dict) else None
+                        if example_profiles and url in example_profiles:
+                            value_example = True
+                            break
+                    if not value_example:
+                        missing_examples.append(content.get("id"))
+            proof_examples: Optional[str] = None
+            value_examples: bool = True
+            if len(missing_examples) > 0:
+                value_examples = False
+                proof_examples = self._format_proof("Missing example for profile(s): ",  missing_examples)
+            checks.append(Check(f"Presence of at least one example for each profile: ", value_examples, proof_examples, self.get_domain()))
+
         if self._check_format:
             formats: Dict[str, Dict[str, str]] = {
                 "id": {"regex": r'^[a-z0-9]+(-[a-z0-9]+)*$', "name": "kebab-case"},
@@ -101,7 +152,7 @@ class ArtifactsChecker(Checker):
                 }
             format_results: Dict[str, List] = {format: [] for format in formats.keys()}
             for artifact in artifacts:
-                artifact_content: Dict = artifact.get_content()
+                artifact_content = artifact.get_content()
                 artifact_match: Dict[str, Optional[str]] = {f: None for f in formats.keys()}
                 for element, format in formats.items():
                     if format:
@@ -133,57 +184,6 @@ class ArtifactsChecker(Checker):
                     value_format = False
                     proof_format = self._format_proof(proof_title, result)
                 checks.append(Check(title, value_format, proof_format, self.get_domain())) 
-        
-        if self._check_examples:
-            missing_examples: List = []
-            profiles: List[Artifact] = [artifact for artifact in self.get_ig().get_artifacts_type("StructureDefinition") if artifact.get_content().get("kind") == "resource"]
-            for profile in profiles:
-                content: Dict = profile.get_content()
-                resource: Optional[str] = content.get("type")
-                url: Optional[str] = content.get("url")
-                if resource:
-                    examples_resource: List[Artifact] = self.get_ig().get_artifacts_type(resource)
-                    value_example: bool = False
-                    for example in examples_resource:
-                        example_content: Optional[dict] = example.get_content()
-                        meta: Optional[dict] = example_content.get("meta") if example_content else None
-                        example_profiles: Optional[list] = meta.get("profile") if isinstance(meta, dict) else None
-                        if example_profiles and url in example_profiles:
-                            value_example = True
-                            break
-                    if not value_example:
-                        missing_examples.append(content.get("id"))
-            proof_examples: Optional[str] = None
-            value_examples: bool = True
-            if len(missing_examples) > 0:
-                value_examples = False
-                proof_examples = self._format_proof("Missing example for profile(s): ",  missing_examples)
-            checks.append(Check(f"Presence of at least one example for each profile: ", value_examples, proof_examples, self.get_domain()))
-
-        for elem in self.get_elements():
-            artifacts_ko: List[Tuple[str, str]] = []
-            artifact_types: List[str] = elem.get("types")
-            names: List[str] = elem.get("names")
-            if artifact_types:
-                artifacts_type = [a for a in artifacts if a.get_resource_type() in artifact_types]
-            else:
-                artifacts_type = artifacts
-            value: Optional[bool] = None
-            proof: Optional[str] = None
-            if not artifacts_type:
-                proof = "No artifacts found for this type."
-            else:
-                for artifact in artifacts_type:
-                    artifact_content = artifact.get_content()
-                    missing = [name for name in names if name not in artifact_content]
-                    for m in missing:
-                        artifacts_ko.append((m, artifact.get_id()))
-                value = not bool(artifacts_ko)
-                proof = self._format_proof("Missing fields per artifacts", artifacts_ko, True)
-            names_label: str = "element" if len(names) == 1 else "elements"
-            names_str: str = ", ".join(names)
-            types_str: str = f"artifacts of type {', '.join(artifact_types)}" if artifact_types else "all artifacts"
-            checks.append(Check(f"Presence of {names_label} {names_str} in {types_str}: ", value, proof, self.get_domain()))
 
         return checks
 
@@ -377,7 +377,8 @@ class TextChecker(LLMChecker):
             ("registry", "a reference to the IG registry as a location to find more IGs of interest"),
             ("background", "background information providing context and motivation for the IG"),
             ("downloads", "information on how to access downloadable artifacts and resources"), 
-            ("examples", "explicit reference within the narrative text to concrete FHIR example resources demonstrating how to use the IG in practice (not just a dedicated 'Examples' section)")
+            ("resources_examples", "explicit reference within the narrative text to concrete FHIR example resources demonstrating how to use the IG in practice (not just a dedicated 'Examples' section)"),
+            ("queries_examples", "concrete example queries that illustrate how to interact with or search for resources related to the IG, when applicable")
         ]
         super().__init__(ig, domain, elements, model)
         self._check_references: bool = check_references
