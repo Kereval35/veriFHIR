@@ -32,10 +32,10 @@ class Checker:
     def check(self) -> List[Check]:
         pass
 
-    def _format_proof(self, title: str, elements: List, reverse: bool = False) -> Optional[str]: # TO IMPROVE (check)
+    def _format_proof(self, title: str, elements: List, reverse: bool = False) -> Optional[str]:
         if len(elements) == 0:
             return None
-        if isinstance(elements[0], tuple):
+        if isinstance(elements[0], tuple) and not isinstance(elements[0][1], list):
             temp: Dict = defaultdict(list)
             for elem in elements:
                 temp[elem[1].strip()].append(elem[0])
@@ -77,7 +77,7 @@ class Checker:
 
 
 class ArtifactsChecker(Checker):
-    def __init__(self, ig: FHIRIG):
+    def __init__(self, ig: FHIRIG, check_format: bool = True, check_examples: bool = True):
         domain: str = "Artifacts"
         elements: List[Dict] = [
             {"names": ["id", "text"]},
@@ -85,75 +85,80 @@ class ArtifactsChecker(Checker):
             {"names": ["description"], "types": ["StructureDefinition"]}
         ]
         super().__init__(ig, domain, elements)
+        self._check_format : bool = check_format
+        self._check_examples : bool = check_examples
 
     def check(self):
         checks: List[Check] = []
         artifacts: List[Artifact] = self.get_ig().get_artifacts()
 
-        # TO IMPROVE (espaces + ANS)
-        formats: Dict[str, Dict[str, str]] = {
-            "id": {"regex": r'^[a-z0-9]+(-[a-z0-9]+)*$', "name": "kebab-case"},
-            "name": {"regex": r'^(?=[A-Z])(?=(?:.*[A-Z]){2,})(?=.*[a-z])[A-Za-z0-9]+$', "name": "PascalCase"},
-            "title": {"regex": r'^[a-zA-Z0-9 ]+$', "name": "alphanumeric + space only"}
-            } # TO IMPROVE (paramétrer match)
-        format_results: Dict[str, List] = {format: [] for format in formats.keys()}
-        format_results["MATCH"] = []
-        for artifact in artifacts:
-            artifact_content: Dict = artifact.get_content()
-            artifact_match: Dict[str, Optional[str]] = {f: None for f in formats.keys()}
-            for element, format in formats.items():
-                artifact_element: Optional[str] = artifact_content.get(element)
-                if artifact_element and isinstance(artifact_element, str):
-                    if not bool(re.fullmatch(format["regex"], artifact_element)):
-                        format_results[element].append(artifact_content.get(element))
-                    else:
-                        artifact_match[element] = artifact_element.lower().replace("-", "").replace(" ", "")
-            mismatch: List[Tuple[str, str]] = []
-            for k1, k2 in combinations(artifact_match.keys(), 2):
-                if artifact_match[k1] and artifact_match[k2]:
-                    if artifact_match[k1] != artifact_match[k2]:
-                        print(k1, k2)
-                        print(artifact_match[k1], artifact_match[k2])
-                        mismatch.append((k1, k2))
-            if len(mismatch) > 0:
-                element_values: str = ", ".join(f"{m}: {artifact_content.get(m)}" for m in formats.keys())
-                mismatch_values = ", ".join(f"{m[0]}/{m[1]}" for m in mismatch)
-                format_results["MATCH"].append(f"{element_values} ({mismatch_values})")
-
-        for element, result in format_results.items():
-            value_format: bool = True
-            proof_format: Optional[str] = None
-            title: str = "Artifacts id-name/title match:" if element == "MATCH" else f"Artifact {element} in {formats[element]['name']} format: "
-            proof_title: str = "Artifacts with mismatches" if element == "MATCH" else f"Artifacts with invalid {element} format"
-            if len(result) > 0:
-                value_format = False
-                proof_format = self._format_proof(proof_title, result)
-            checks.append(Check(title, value_format, proof_format, self.get_domain())) 
-
-        missing_examples = []
-        profiles = [artifact for artifact in self.get_ig().get_artifacts_type("StructureDefinition") if artifact.get_content().get("kind") == "resource"]
-        for profile in profiles: # TO IMPROVE (add to elements)
-            content: Dict = profile.get_content()
-            resource: Optional[str] = content.get("type")
-            url: Optional[str] = content.get("url")
-            if resource:
-                examples_resource: List[Artifact] = self.get_ig().get_artifacts_type(resource)
-                value_example: bool = False
-                for example in examples_resource:
-                    example_content: Optional[dict] = example.get_content()
-                    meta: Optional[dict] = example_content.get("meta") if example_content else None
-                    example_profiles: Optional[list] = meta.get("profile") if isinstance(meta, dict) else None
-                    if example_profiles and url in example_profiles:
-                        value_example = True
-                        break
-                if not value_example:
-                    missing_examples.append(content.get("id"))
-        proof_examples: Optional[str] = None
-        value_examples: bool = True
-        if len(missing_examples) > 0:
-            value_examples = False
-            proof_examples = self._format_proof("Missing example for profile(s): ",  missing_examples)
-        checks.append(Check(f"Presence of at least one example for each profile: ", value_examples, proof_examples, self.get_domain()))
+        if self._check_format:
+            formats: Dict[str, Dict[str, str]] = {
+                "id": {"regex": r'^[a-z0-9]+(-[a-z0-9]+)*$', "name": "kebab-case"},
+                "name": {"regex": r'^(?=[A-Z])(?=(?:.*[A-Z]){2,})(?=.*[a-z])[A-Za-z0-9]+$', "name": "PascalCase"},
+                "title": {"regex": r'^[a-zA-Z0-9 ]+$', "name": "alphanumeric + space only"},
+                "MATCH": {}
+                }
+            format_results: Dict[str, List] = {format: [] for format in formats.keys()}
+            for artifact in artifacts:
+                artifact_content: Dict = artifact.get_content()
+                artifact_match: Dict[str, Optional[str]] = {f: None for f in formats.keys()}
+                for element, format in formats.items():
+                    if format:
+                        artifact_element: Optional[str] = artifact_content.get(element)
+                        if artifact_element and isinstance(artifact_element, str):
+                            if not bool(re.fullmatch(format["regex"], artifact_element)):
+                                result_str: str = artifact_element
+                                if element != "id":
+                                    result_str += f" (id: {artifact.get_id()})"
+                                format_results[element].append(result_str)
+                            else:
+                                artifact_match[element] = artifact_element.lower().replace("-", "").replace(" ", "")
+                if "MATCH" in formats.keys():
+                    mismatch: List[Tuple[str, str]] = []
+                    for k1, k2 in combinations(artifact_match.keys(), 2):
+                        if artifact_match[k1] and artifact_match[k2]:
+                            if artifact_match[k1] != artifact_match[k2]:
+                                mismatch.append((k1, k2))
+                    if len(mismatch) > 0:
+                        element_values: str = ", ".join(f"{m}: {artifact_content.get(m)}" for m in formats.keys() if m != "MATCH")
+                        mismatch_values: str = ", ".join(f"{m[0]}/{m[1]}" for m in mismatch)
+                        format_results["MATCH"].append(f"{element_values} ({mismatch_values})")
+            for element, result in format_results.items():
+                value_format: bool = True
+                proof_format: Optional[str] = None
+                title: str = "Artifacts id-name/title match:" if element == "MATCH" else f"Artifact {element} in {formats[element]['name']} format: "
+                proof_title: str = "Artifacts with mismatches" if element == "MATCH" else f"Artifacts with invalid {element} format"
+                if len(result) > 0:
+                    value_format = False
+                    proof_format = self._format_proof(proof_title, result)
+                checks.append(Check(title, value_format, proof_format, self.get_domain())) 
+        
+        if self._check_examples:
+            missing_examples: List = []
+            profiles: List[Artifact] = [artifact for artifact in self.get_ig().get_artifacts_type("StructureDefinition") if artifact.get_content().get("kind") == "resource"]
+            for profile in profiles:
+                content: Dict = profile.get_content()
+                resource: Optional[str] = content.get("type")
+                url: Optional[str] = content.get("url")
+                if resource:
+                    examples_resource: List[Artifact] = self.get_ig().get_artifacts_type(resource)
+                    value_example: bool = False
+                    for example in examples_resource:
+                        example_content: Optional[dict] = example.get_content()
+                        meta: Optional[dict] = example_content.get("meta") if example_content else None
+                        example_profiles: Optional[list] = meta.get("profile") if isinstance(meta, dict) else None
+                        if example_profiles and url in example_profiles:
+                            value_example = True
+                            break
+                    if not value_example:
+                        missing_examples.append(content.get("id"))
+            proof_examples: Optional[str] = None
+            value_examples: bool = True
+            if len(missing_examples) > 0:
+                value_examples = False
+                proof_examples = self._format_proof("Missing example for profile(s): ",  missing_examples)
+            checks.append(Check(f"Presence of at least one example for each profile: ", value_examples, proof_examples, self.get_domain()))
 
         for elem in self.get_elements():
             artifacts_ko: List[Tuple[str, str]] = []
@@ -179,6 +184,7 @@ class ArtifactsChecker(Checker):
             names_str: str = ", ".join(names)
             types_str: str = f"artifacts of type {', '.join(artifact_types)}" if artifact_types else "all artifacts"
             checks.append(Check(f"Presence of {names_label} {names_str} in {types_str}: ", value, proof, self.get_domain()))
+
         return checks
 
 
@@ -199,7 +205,7 @@ class RefsChecker(Checker):
                     pages_refs: Dict[str, str] = page.get_links()
                     for page_ref, page_ref_desc in pages_refs.items():
                         if ref in page_ref:
-                            refs.append((page.get_name(), f"{page_ref_desc} ({page_ref})"))
+                            refs.append((page.get_name(), f"\"{page_ref_desc}\" ({page_ref})"))
                 value: bool = False
                 proof: Optional[str] = None
                 if len(refs) > 0:
@@ -361,7 +367,7 @@ class PageTypeChecker(LLMChecker):
 
 
 class TextChecker(LLMChecker):
-    def __init__(self, ig: FHIRIG, model: str):
+    def __init__(self, ig: FHIRIG, model: str, check_references: bool = True):
         domain: str = "Writing and narrative"
         elements: List[Tuple[str, str]] = [
             ("prior", "a section that explains key information that needs to be understood prior to reading the IG"),
@@ -371,9 +377,10 @@ class TextChecker(LLMChecker):
             ("registry", "a reference to the IG registry as a location to find more IGs of interest"),
             ("background", "background information providing context and motivation for the IG"),
             ("downloads", "information on how to access downloadable artifacts and resources"), 
-            ("examples", "explicit reference within the narrative text to concrete example resources demonstrating how to use the IG in practice (not just a dedicated 'Examples' section)")
+            ("examples", "explicit reference within the narrative text to concrete FHIR example resources demonstrating how to use the IG in practice (not just a dedicated 'Examples' section)")
         ]
-        super().__init__(ig, domain, elements, model) 
+        super().__init__(ig, domain, elements, model)
+        self._check_references: bool = check_references
 
     def _set_llm(self):
         system_prompt: str = """
@@ -397,16 +404,35 @@ class TextChecker(LLMChecker):
 
     def check(self):
         checks: List[Check] = []
-        profiles: List[Artifact] = self.get_ig().get_artifacts_type("StructureDefinition")
-        profiles_elements: List[Tuple[str, str]] = [(p.get_id(), f"a reference to the profile {p.get_id()} (not just the resource type)") for p in profiles] # TO IMPROVE (profile name + text)
-        sps: List[Artifact] = self.get_ig().get_artifacts_type("SearchParameter")
-        sps_elements: List[Tuple[str, str]] = [(p.get_id(), f"a reference to the search parameter {p.get_id()}") for p in sps] # TO IMPROVE (profile name + text)
-        all_elements: List[Tuple[str, str]] = self.get_elements() + profiles_elements + sps_elements
-        results: Dict[str, List] = {elem[0]: [] for elem in all_elements}
-        for elements in [self.get_elements(), profiles_elements, sps_elements]:
+        all_elements: List = [self.get_elements()]
+
+        if self._check_references:
+            profiles: List[Artifact] = [artifact for artifact in self.get_ig().get_artifacts_type("StructureDefinition") if artifact.get_content().get("kind") == "resource"]
+            profiles_str: List[Tuple] = []
+            for profile in profiles:
+                profile_name = profile.get_content().get("name")
+                if profile_name:
+                    profiles_str.append((profile.get_id(), profile_name))
+                else:
+                    profiles_str.append((profile.get_id(), profile.get_id()))
+            profiles_elements: List[Tuple[str, str]] = [(p[0], f"a reference to the profile {p[1]} (not just the resource type)") for p in profiles_str]
+            sps: List[Artifact] = self.get_ig().get_artifacts_type("SearchParameter")
+            sps_str: List[Tuple] = []
+            for sp in sps:
+                sp_name = sp.get_content().get("name")
+                if sp_name:
+                    sps_str.append((sp.get_id(), sp_name))
+                else:
+                    sps_str.append((sp.get_id(), sp.get_id()))
+            sps_elements: List[Tuple[str, str]] = [(s[0], f"a reference to the search parameter {s[1]}") for s in sps_str]
+            all_elements.extend([profiles_elements, sps_elements])
+
+        all_elements_flat: List[Tuple[str, str]] = [e for sub_elements in all_elements for e in sub_elements]
+        results: Dict[str, List] = {elem[0]: [] for elem in all_elements_flat}
+        for elements in all_elements:
             if len(elements) > 0:
                 for page in self.get_ig().get_pages():
-                    if page.get_name() not in ["artifacts.html", "toc.html"]: # TO IMPROVE
+                    if page.get_name() not in ["artifacts.html", "toc.html"]:
                         response_bool: bool = False
                         select_elements: str =  "\n* ".join(f"{k}: {v}" for k, v in elements)
                         user_prompt: str = f"\nElements:\n* {select_elements}\nPage content: {page.get_text()}"
@@ -427,11 +453,12 @@ class TextChecker(LLMChecker):
                                         if extract:
                                             if id in results.keys():
                                                 if extract.lower().strip() not in ["none", "null"]:
-                                                    results[id].append((page.get_name(), extract))
+                                                    results[id].append((page.get_name(), f"\"{extract}\""))
                                             else:
                                                 response_bool = False
                         if not response_bool:
                             print(f"TextChecker: page {page.get_name()} skipped (LLM error response)")
+
         for id, elem in self.get_elements():
             value: Optional[bool] = None
             proof: Optional[str] = None
@@ -444,6 +471,7 @@ class TextChecker(LLMChecker):
             else:
                 value = False
             checks.append(Check(f"Presence of {elem}: ", value, proof, self.get_domain()))
+
         for name, artifacts_elements in {"profile": profiles_elements, "search parameter": sps_elements}.items():
             value_artifacts: Optional[bool] = True
             proof_artifacts: Optional[str] = None
@@ -460,7 +488,7 @@ class TextChecker(LLMChecker):
                     else:
                         proof_artifact = "pages " + ", ".join([r[0] for r in results[id]])
                     result_artifacts.append((id, proof_artifact))
-                proof_artifacts = self._format_proof(f"{name} references", result_artifacts) # TO IMPROVE (title)
+                proof_artifacts = self._format_proof(f"{name.capitalize()} references", result_artifacts)
             checks.append(Check(f"Presence of a reference to each {name}: ", value_artifacts, proof_artifacts, self.get_domain()))
         return checks
     
@@ -476,12 +504,8 @@ class AmbiguousWordingChecker(LLMChecker):
         Given the content of a FHIR Implementation Guide page, identify ONLY high-confidence technical ambiguities that would likely lead to incorrect implementation.
         - Evaluate statements in the context of the entire page.
         - Consider ONLY ambiguities that would force an implementer to make an uncertain or conflicting technical decision.
-        ### STRICT FILTER (very important):
-        Do NOT report anything unless ALL conditions are met:
-        - The ambiguity directly affects FHIR implementation behavior (not interpretation, not documentation clarity)
-        - It leads to at least two plausible but conflicting implementations
-        - It cannot be resolved from surrounding context in the page
-        - It concerns normative or constraint-bearing content (e.g. MUST/SHOULD/MAY, cardinality, profiles, bindings, invariants)
+        ### IMPORTANT:
+        Ignore isolated labels, headings, or short fragments unless they explicitly express a constraint or implementation rule. 
         ### EXCLUDE COMPLETELY:
         - vague wording without implementation consequences
         - editorial or explanatory ambiguity
@@ -489,12 +513,6 @@ class AmbiguousWordingChecker(LLMChecker):
         - anything resolvable by reading the rest of the section
         - structural or formatting issues
         - fragments, headings, labels, identifiers, or metadata
-        ### ONLY ACCEPTABLE TYPES OF AMBIGUITY:
-        - conflicting or unclear cardinality constraints
-        - unclear binding strength or terminology usage
-        - ambiguous slicing or profiling rules
-        - unclear invariants or conditional constraints
-        - conflicting MUST/SHOULD/MAY interpretation within the page
 
         **Output format:**  
         Return a JSON object:
@@ -531,10 +549,13 @@ class AmbiguousWordingChecker(LLMChecker):
                 if isinstance(response_json, list):
                     for elem_response in response_json:
                         if all(k in elem_response.keys() for k in ["extract", "reason"]):
-                            results.append((page_name, f"{elem_response['extract']} ({elem_response['reason']})")) # TO IMPROVE
+                            results.append((page_name, f"\"{elem_response['extract']}\" ➡️ {elem_response['reason']}"))
         if len(results) > 0:
             value = False
-            proof = self._format_proof("Ambiguous or unclear technical formulations", results)
+            temp = defaultdict(list)
+            for k, v in results:
+                temp[k].append(v)
+            proof = self._format_proof("Ambiguous or unclear technical formulations", list(temp.items()))
         else:
             value = True
         checks: List[Check] = [Check(f"Clarity for technical implementation: ", value, proof, self.get_domain())]
