@@ -45,6 +45,14 @@ python main.py --file "path/to/your/implementation_guide.zip" --output "path/to/
 
 After running the command, VeriFHIR will generate a report in the specified output folder. An [example report](https://kereval35.github.io/veriFHIR/example/example_report.html) is available in the [example](./example) folder.
 
+### Obligations extraction script
+
+In addition to the main VeriFHIR workflow, the repository includes a script to extract FHIR obligations from IG. It parses StructureDefinition resources and retrieves elements annotated with the [FHIR obligation extension](http://hl7.org/fhir/StructureDefinition/obligation). The extracted data includes the profile, element path, slice name, obligation code, and actor, and is exported as a CSV file for further analysis or reuse.
+
+```
+python obligations.py --file "path/to/your/implementation_guide.zip" --output "path/to/output/folder"
+```
+
 # License 📜
 
 This project is licensed under the Apache License, Version 2.0. See the [LICENSE](./LICENSE) file for details.
