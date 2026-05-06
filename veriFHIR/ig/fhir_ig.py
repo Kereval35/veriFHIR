@@ -37,7 +37,10 @@ class Metadata:
             file_path = Path(IG.get_path(), "site", "package.manifest.json")
             contents = json.load(codecs.open(str(file_path), 'r', 'utf-8-sig'))
             self._set_fhir_version(contents['fhirVersion'][0])
-            IG.set_path(Path(IG.get_path(), "site"))
+            if Path(IG.get_path(), "site", "en").exists():
+                IG.set_path(Path(IG.get_path(), "site", "en"))
+            else:
+                IG.set_path(Path(IG.get_path(), "site"))
         else:
             self._set_ig_type("Simplifier")
             package_path: Path = Path(IG.get_path(), "packages")
@@ -163,7 +166,7 @@ class FHIRIG():
                     if add and link not in [page.get_name() for page in pages]:
                         pages.append(Page(Path(self.get_path(), link), link))
         if len(pages) == 0:
-            raise Exception("No pages found from the IG index page.")
+            raise Exception("No pages found.")
         if len(pages) > 50:
             raise Exception(f"Too many narrative pages ({len(pages)}) in the IG.") 
         return pages

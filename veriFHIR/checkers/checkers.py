@@ -77,7 +77,7 @@ class Checker:
 
 
 class ArtifactsChecker(Checker):
-    def __init__(self, ig: FHIRIG, check_format: bool = True, check_examples: bool = True):
+    def __init__(self, ig: FHIRIG, check_format: bool = False, check_examples: bool = True):
         domain: str = "Artifacts"
         elements: List[Dict[str, List[str]]] = [
             {"names": ["id", "text"]},
@@ -559,5 +559,6 @@ class AmbiguousWordingChecker(LLMChecker):
             proof = self._format_proof("Ambiguous or unclear technical formulations", list(temp.items()))
         else:
             value = True
+            proof = "No ambiguous or unclear technical formulations."
         checks: List[Check] = [Check(f"Clarity for technical implementation: ", value, proof, self.get_domain())]
         return checks

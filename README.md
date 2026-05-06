@@ -40,6 +40,8 @@ python main.py --file "path/to/your/implementation_guide.zip" --output "path/to/
 * `--model` (optional): Name of the OpenAI model to use.
   * The model must support [structured outputs](https://platform.openai.com/docs/guides/structured-outputs).
   * Default value: gpt-4o-mini
+* `--check-format`: Check artifacts naming rules according to [ANS naming rules](https://ansforge.github.io/IG-documentation/main/ig/mod_bonnes_pratiques.html#r%C3%A8gles-de-nommage-des-ressources-de-conformit%C3%A9).
+* `--check-clarity`: Check for ambiguous or unclear wording. This may produce a large number of findings depending on the text, including minor or subjective issues.
 
 After running the command, VeriFHIR will generate a report in the specified output folder. An [example report](https://kereval35.github.io/veriFHIR/example/example_report.html) is available in the [example](./example) folder.
 
