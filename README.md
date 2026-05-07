@@ -43,7 +43,7 @@ python main.py --file "path/to/your/implementation_guide.zip" --output "path/to/
 * `--check-format`: Check artifacts naming rules according to [ANS naming rules](https://ansforge.github.io/IG-documentation/main/ig/mod_bonnes_pratiques.html#r%C3%A8gles-de-nommage-des-ressources-de-conformit%C3%A9).
 * `--check-clarity`: Check for ambiguous or unclear wording. This may produce a large number of findings depending on the text, including minor or subjective issues.
 
-After running the command, VeriFHIR will generate a report in the specified output folder. An [example report](https://kereval35.github.io/veriFHIR/example/example_report.html) is available in the [example](./example) folder.
+After running the command, VeriFHIR will generate a report in the specified output folder. Report examples are available in the [examples](./examples) folder. To view an example report, use the following URL format and replace [file_name] with the desired file: https://kereval35.github.io/veriFHIR/example/[file_name].
 
 ### Obligations extraction script
 

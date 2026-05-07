@@ -433,7 +433,7 @@ class TextChecker(LLMChecker):
         for elements in all_elements:
             if len(elements) > 0:
                 for page in self.get_ig().get_pages():
-                    if page.get_name() not in ["artifacts.html", "toc.html"]:
+                    if page.get_name() not in ["artifacts.html", "toc.html", "issues.html"]:
                         response_bool: bool = False
                         select_elements: str =  "\n* ".join(f"{k}: {v}" for k, v in elements)
                         user_prompt: str = f"\nElements:\n* {select_elements}\nPage content: {page.get_text()}"
@@ -472,25 +472,25 @@ class TextChecker(LLMChecker):
             else:
                 value = False
             checks.append(Check(f"Presence of {elem}: ", value, proof, self.get_domain()))
-
-        for name, artifacts_elements in {"profile": profiles_elements, "search parameter": sps_elements}.items():
-            value_artifacts: Optional[bool] = True
-            proof_artifacts: Optional[str] = None
-            if len(artifacts_elements) == 0:
-                value_artifacts = None
-                proof_artifacts = f"No artifact of type {name}"
-            else:
-                result_artifacts: List = []
-                for id, _ in artifacts_elements:
-                    proof_artifact: Optional[str] = None
-                    if len(results[id]) == 0:
-                        value_artifacts = False
-                        proof_artifact = "no reference"
-                    else:
-                        proof_artifact = "pages " + ", ".join([r[0] for r in results[id]])
-                    result_artifacts.append((id, proof_artifact))
-                proof_artifacts = self._format_proof(f"{name.capitalize()} references", result_artifacts)
-            checks.append(Check(f"Presence of a reference to each {name}: ", value_artifacts, proof_artifacts, self.get_domain()))
+        if self._check_references:
+            for name, artifacts_elements in {"profile": profiles_elements, "search parameter": sps_elements}.items():
+                value_artifacts: Optional[bool] = True
+                proof_artifacts: Optional[str] = None
+                if len(artifacts_elements) == 0:
+                    value_artifacts = None
+                    proof_artifacts = f"No artifact of type {name}"
+                else:
+                    result_artifacts: Dict[str, List] = {"ok": [], "ko": []}
+                    for id, _ in artifacts_elements:
+                        proof_artifact: Optional[str] = None
+                        if len(results[id]) == 0:
+                            value_artifacts = False
+                            result_artifacts["ko"].append(id)
+                        else:
+                            proof_artifact = "pages " + ", ".join([r[0] for r in results[id]])
+                            result_artifacts["ok"].append((id, proof_artifact))
+                    proof_artifacts = self._format_proof(f"Missing references", result_artifacts["ko"])
+                checks.append(Check(f"Presence of a reference to each {name}: ", value_artifacts, proof_artifacts, self.get_domain()))
         return checks
     
 
