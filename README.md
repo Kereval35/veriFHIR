@@ -4,7 +4,9 @@
 
 **VeriFHIR** is a tool designed to support the FHIR interoperability community by **assessing the quality of FHIR Implementation Guides (IGs)**. As FHIR IGs become easier to create, ensuring their consistency, accuracy, and adherence to best practices is increasingly important.
 
-**VeriFHIR** performs **automated checks by leveraging Large Language Models (LLMs)** to analyze narrative content and provide actionable insights to improve clarity, consistency, and overall quality.
+**VeriFHIR** performs **automated checks by leveraging Large Language Models (LLMs)** to analyze narrative content and provide actionable insights to improve clarity, consistency, and overall quality. Examples of generated quality review reports are available below:
+* [Report for Mobile access to Health Documents (MHD) IG - version 4.2.3](https://kereval35.github.io/veriFHIR/examples/quality-review_ihe.iti.mhd_2026-05-06-15-53.html)
+* [Report for EHDS Logical Information Models IG - version 1.0.0](https://kereval35.github.io/veriFHIR/examples/quality-review_xtehr.eu.ehds.models_2026-05-06-16-18.html)
 
 # Getting started 🚀
 
@@ -19,12 +21,12 @@
 
 VeriFHIR requires an [OpenAI API](https://platform.openai.com/api-keys) key to work. 
 Follow these steps:
-* Create a new .env file by copying the provided [.env_example](./veriFHIR/config/.env_example).
+* Create a new .env file by copying the provided [.env_example](https://github.com/Kereval35/veriFHIR/blob/main/veriFHIR/config/.env_example).
 * Replace the placeholder with your OpenAI API key.
 
 ## Usage
 
-Once VeriFHIR is installed and configured with your OpenAI API key, run the [main.py](./main.py) script to analyze a FHIR Implementation Guide using the command-line interface.
+Once VeriFHIR is installed and configured with your OpenAI API key, run the [main.py](https://github.com/Kereval35/veriFHIR/blob/main/main.py) script to analyze a FHIR Implementation Guide using the command-line interface.
 
 **Command:**
 ```
@@ -43,7 +45,7 @@ python main.py --file "path/to/your/implementation_guide.zip" --output "path/to/
 * `--check-format`: Check artifacts naming rules according to [ANS naming rules](https://ansforge.github.io/IG-documentation/main/ig/mod_bonnes_pratiques.html#r%C3%A8gles-de-nommage-des-ressources-de-conformit%C3%A9).
 * `--check-clarity`: Check for ambiguous or unclear wording. This may produce a large number of findings depending on the text, including minor or subjective issues.
 
-After running the command, VeriFHIR will generate a report in the specified output folder. Report examples are available in the [examples](./examples) folder. To view a report, use the following URL format by replacing the file name in the URL with the desired report file, for example: https://kereval35.github.io/veriFHIR/examples/quality-review_ihe.iti.mhd_2026-05-06-15-53.html.
+After running the command, VeriFHIR will generate a report in the specified output folder.
 
 ### Obligations extraction script
 
@@ -55,7 +57,7 @@ python obligations.py --file "path/to/your/implementation_guide.zip" --output "p
 
 # License 📜
 
-This project is licensed under the Apache License, Version 2.0. See the [LICENSE](./LICENSE) file for details.
+This project is licensed under the Apache License, Version 2.0. See the [LICENSE](https://github.com/Kereval35/veriFHIR/blob/main/LICENSE) file for details.
 
 # Support 💬
 
